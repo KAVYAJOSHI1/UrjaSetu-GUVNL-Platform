@@ -27,10 +27,12 @@ class QueryBuilder {
   body: string | null;
   headers: Record<string, string>;
   isSingle: boolean = false;
+  bucket: string | null = null;
 
-  constructor(table: string, url: string = BASE_URL) {
+  constructor(table: string, url: string = BASE_URL, bucket: string | null = null) {
     this.table = table;
     this.baseUrl = url;
+    this.bucket = bucket;
     this.queryParams = new URLSearchParams();
     this.method = 'GET';
     this.body = null;
@@ -89,23 +91,41 @@ class QueryBuilder {
     return this;
   }
 
-  // File Upload (mock)
-  upload(path: any, file: any) {
-    // Not fully implemented in local backend yet, returning fake url
+  // File Upload (Real fetch implementation)
+  async upload(path: any, file: any) {
+    if (this.table === 'storage' && this.bucket) {
+      const url = `${this.baseUrl}/storage/v1/object/${this.bucket}/${path}`;
+      try {
+        // file is expected to be FormData if coming from ReportScreen
+        const res = await fetch(url, {
+          method: 'POST',
+          body: file
+        });
+        const data = await res.json();
+        if (!res.ok) return { data: null, error: data };
+        return { data: { path: data.path, Key: data.Key }, error: null };
+      } catch (e) {
+        return { data: null, error: e };
+      }
+    }
     return Promise.resolve({ data: { path }, error: null as any });
   }
 
   getPublicUrl(path: any) {
+    if (this.table === 'storage' && this.bucket) {
+      // Return local static url
+      return { data: { publicUrl: `${this.baseUrl}/storage/v1/object/public/${this.bucket}/${path}` } };
+    }
     return { data: { publicUrl: 'https://via.placeholder.com/150' } };
   }
 
   async execute() {
     // Check if it's storage
     if (this.table === 'storage') {
-      // Return mock storage object
+      // Return mock storage object with bound methods
       return {
-        upload: this.upload,
-        getPublicUrl: this.getPublicUrl,
+        upload: (p: any, f: any) => this.upload(p, f),
+        getPublicUrl: (p: any) => this.getPublicUrl(p),
         from: (bucket: any) => this // chaining hack
       };
     }
@@ -162,7 +182,6 @@ const MOCK_SESSION = {
 };
 
 export const supabase = {
-  // Auth Namespace
   // Auth Namespace
   auth: {
     signInWithPassword: async ({ email, password }: any) => {
@@ -230,7 +249,7 @@ export const supabase = {
   // Storage Namespace
   storage: {
     from: (bucket: any) => {
-      return new QueryBuilder('storage'); // Hacky
+      return new QueryBuilder('storage', BASE_URL, bucket);
     }
   },
 

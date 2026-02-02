@@ -1,4 +1,4 @@
-import { Home, Users, AlertCircle, LogOut } from "lucide-react";
+import { Home, Users, AlertCircle, LogOut, Zap } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     Sidebar,
@@ -49,9 +49,14 @@ export function AppSidebar() {
     };
 
     return (
-        <Sidebar>
-            <SidebarHeader className="p-4 border-b">
-                <h2 className="text-xl font-bold text-primary">GUVNL Admin</h2>
+        <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+            <SidebarHeader className="p-6 border-b border-sidebar-border">
+                <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
+                        <Zap className="h-5 w-5 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold tracking-tight text-white">UrjaSetu</h2>
+                </div>
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
@@ -75,8 +80,8 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="p-4 border-t">
-                <Button variant="ghost" className="w-full justify-start text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleLogout}>
+            <SidebarFooter className="p-4 border-t border-sidebar-border">
+                <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-950/20" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                 </Button>

@@ -202,8 +202,11 @@ const ReportScreen = () => {
         publicImageUrl = urlData.publicUrl;
       }
 
-      // 3. Prepare location data for PostGIS
-      const locationPoint = `POINT(${coords.longitude} ${coords.latitude})`;
+      // 3. Prepare location data for PostGIS (Stored as JSON for local compatibility)
+      const locationJson = JSON.stringify({
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      });
 
       // 4. Insert into the 'issues' table
       const { error: insertError } = await supabase
@@ -213,7 +216,7 @@ const ReportScreen = () => {
           title: issueType, // Using issueType as the title
           description: description,
           issue_type: issueType,
-          location: locationPoint, // The PostGIS geography point
+          location: locationJson, // Changed from POINT string to JSON
           address_text: location, // The human-readable string address
           image_url: publicImageUrl,
           status: 'Reported',

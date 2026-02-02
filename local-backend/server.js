@@ -308,12 +308,70 @@ app.patch('/rest/v1/:table', (req, res) => {
     });
 });
 
+const fs = require('fs');
+const path = require('path');
+
 // Multer for file uploads
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+
+// Configure Multer to preserve file extensions
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = 'uploads/';
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir);
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        // Use the key from the request parameter if available (mimicking Supabase path) or original name
+        // Supabase upload URL: /storage/v1/object/{bucket}/{wildcard}
+        // But multer runs before route params are fully parsed sometimes, depending on setup.
+        // Simplest: Use original name + timestamp to avoid collisions
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+});
+const upload = multer({ storage: storage });
+
+// Static serving of uploads
+// Access via: http://localhost:3000/storage/v1/object/public/issue-images/filename
+// We will just serve the 'uploads' directory at that base path for simplicity
+app.use('/storage/v1/object/public/issue-images', express.static('uploads'));
+
+// Verify uploads dir exists
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
+
+// --- Storage Upload Route (Mocking Supabase) ---
+// POST /storage/v1/object/:bucket/:filename
+app.post('/storage/v1/object/:bucket/:filename', upload.single('file'), (req, res) => {
+    console.log(`[Storage] Upload to bucket: ${req.params.bucket}, content: ${req.params.filename}`);
+    if (req.file) {
+        // Return the path that matches our static serve route
+        // We aren't preserving the exact user-provided text path for the filename on disk for security/simplicity,
+        // but we return the filename we saved so the client can save THAT to the database.
+        // WAIT: Supabase expects us to return the 'path' (key) we asked for.
+        // But since we randomized the name on disk, we have a mismatch.
+        // Let's just return the filename we saved as the 'Key'.
+
+        console.log('[Storage] Saved as:', req.file.filename);
+        res.status(200).json({
+            Key: `${req.params.bucket}/${req.file.filename}`,
+            path: req.file.filename // We'll rely on this returning the actual filename
+        });
+    } else {
+        res.status(400).json({ error: "No file uploaded" });
+    }
+});
 
 // --- AI Mock Function ---
 app.post('/functions/v1/analyze-image', upload.single('file'), (req, res) => {
+    console.log('[AI] Received request /functions/v1/analyze-image');
+    if (req.file) console.log('[AI] File received:', req.file.path, req.file.size);
+    else console.log('[AI] No file received!');
     // In a real scenario, we would pass req.file.path to a Python script
     // E.g., const { exec } = require('child_process');
     // exec(`python3 predict.py ${req.file.path}`, ...)

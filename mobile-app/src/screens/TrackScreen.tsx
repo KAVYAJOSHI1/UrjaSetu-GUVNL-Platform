@@ -93,30 +93,50 @@ const TrackScreen = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Issues
+      const { data: issuesData, error: issuesError } = await supabase
         .from('issues')
-        .select(`
-          id,
-          created_at,
-          issue_type,
-          description,
-          status,
-          priority,
-          status_history (
-            id,
-            created_at,
-            status
-          )
-        `)
+        .select('*')
         .eq('citizen_id', user.id)
-        .order('created_at', { ascending: false }) // Newest reports first
-        // Get timeline from oldest to newest
-        .order('created_at', { foreignTable: 'status_history', ascending: true });
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (issuesError) throw issuesError;
+      if (!issuesData || issuesData.length === 0) {
+        setReports([]);
+        return;
       }
-      setReports(data || []);
+
+      const issues = issuesData as Issue[];
+      const issueIds = issues.map(i => i.id);
+
+      // 2. Fetch History for these issues
+      const { data: historyData, error: historyError } = await supabase
+        .from('status_history')
+        .select('*')
+        .in('issue_id', issueIds)
+        .order('created_at', { ascending: true });
+
+      if (historyError) {
+        console.error("Error fetching history:", historyError);
+        // Fallback: just show issues with empty history
+        setReports(issues.map(i => ({ ...i, status_history: [] })));
+        return;
+      }
+
+      // 3. Merge History into Issues
+      const historyMap: Record<string, StatusHistoryItem[]> = {};
+      (historyData as any[]).forEach((h: any) => {
+        if (!historyMap[h.issue_id]) historyMap[h.issue_id] = [];
+        historyMap[h.issue_id].push(h);
+      });
+
+      const mergedReports = issues.map(issue => ({
+        ...issue,
+        status_history: historyMap[issue.id] || []
+      }));
+
+      setReports(mergedReports);
+
     } catch (error: any) {
       console.error('Error fetching reports:', error.message);
     } finally {
