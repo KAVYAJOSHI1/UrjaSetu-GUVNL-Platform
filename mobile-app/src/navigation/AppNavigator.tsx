@@ -18,6 +18,7 @@ import ReportDetailScreen from '../screens/ReportDetailScreen';
 import ReportScreen from '../screens/ReportScreen';
 import SuggestionsScreen from '../screens/SuggestionsScreen';
 import TrackScreen from '../screens/TrackScreen';
+import QRScanScreen from '../screens/QRScanScreen';
 
 // Import ALL Technician screens
 import ProofOfWorkScreen from '../screens/Technician/ProofOfWorkScreen';
@@ -56,6 +57,7 @@ function CitizenTabNavigator() {
             case 'Report': iconName = 'alert-triangle'; break;
             case 'Track': iconName = 'clipboard'; break;
             case 'Suggestions': iconName = 'award'; break;
+            case 'QRScan': iconName = 'maximize'; break;
             case 'Guidance': iconName = 'book-open'; break;
             default: iconName = 'circle';
           }
@@ -71,6 +73,7 @@ function CitizenTabNavigator() {
       <MainTabs.Screen name="Report" component={ReportScreen} options={{ title: t('nav_feedback') }} />
       <MainTabs.Screen name="Track" component={TrackScreen} options={{ title: t('nav_track') }} />
       <MainTabs.Screen name="Suggestions" component={SuggestionsScreen} options={{ title: t('nav_suggestions') }} />
+      <MainTabs.Screen name="QRScan" component={QRScanScreen} options={{ title: t('nav_qr') }} />
       <MainTabs.Screen name="Guidance" component={GuidanceScreen} options={{ title: t('nav_guidance') }} />
     </MainTabs.Navigator>
   );
@@ -116,7 +119,7 @@ export default function AppNavigator() {
           <RootStack.Group>
             {(() => {
               switch (user?.role) {
-                case 'technician':
+                case 'lineman':
                   return (
                     <>
                       <RootStack.Screen name="TechnicianMain" component={TechnicianTabNavigator} />
@@ -143,8 +146,8 @@ export default function AppNavigator() {
           // Note: "Auth" is not a defined screen in your RootStackParamList, so this now groups Login/Register.
           // For a cleaner approach, you might add `Auth: NavigatorScreenParams<AuthStackParamList>` to your RootStackParamList.
           <RootStack.Group>
-             <RootStack.Screen name="Login" component={LoginScreen} />
-             <RootStack.Screen name="Register" component={RegisterScreen} />
+            <RootStack.Screen name="Login" component={LoginScreen} />
+            <RootStack.Screen name="Register" component={RegisterScreen} />
           </RootStack.Group>
         )}
       </RootStack.Navigator>

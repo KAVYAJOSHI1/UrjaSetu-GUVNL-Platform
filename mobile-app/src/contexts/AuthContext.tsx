@@ -1,13 +1,28 @@
-import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase'; // Your Supabase client
+
+// Mock types for local usage
+export type User = {
+  id: string;
+  email?: string;
+  user_metadata: {
+    [key: string]: any;
+  };
+  role?: string;
+};
+export type Session = {
+  access_token: string;
+  token_type: string;
+  user: User | null;
+};
 
 // Define the shape of our User, including the role from our 'profiles' table
 export interface AppUser {
   id: string;
   email?: string;
   name: string;
-  role: 'citizen' | 'technician';
+  role: 'citizen' | 'lineman';
+  phone?: string;
 }
 
 interface AuthContextType {
@@ -16,7 +31,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ data: any; error: any; }>;
   logout: () => Promise<any>;
-  // You can add a register function here later
+  register: (email: string, password: string, name: string, phone: string, role: string) => Promise<{ data: any; error: any; }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,15 +43,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Check for an existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      setSession(session as any);
       if (session) {
-        fetchUserProfile(session.user);
+        fetchUserProfile((session as any).user);
       }
     });
 
     // Listen for auth state changes (login, logout)
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (_event: any, session: any) => {
         setSession(session);
         if (session) {
           fetchUserProfile(session.user);
@@ -56,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, role')
+        .select('id, name, role, phone')
         .eq('id', authUser.id)
         .single(); // We expect only one row
 
@@ -67,7 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: data.id,
           email: authUser.email,
           name: data.name || '', // Ensure name is not null
-          role: data.role as 'citizen' | 'technician',
+          role: data.role as 'citizen' | 'lineman',
+          phone: data.phone,
         });
       }
     } catch (error: any) {
@@ -82,12 +98,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
     });
-    
-    if (data.user) {
-        console.log('Logging in as', data.user.email);
-        // fetchUserProfile will be called by the onAuthStateChange listener
+
+    if (data.session) {
+      console.log('Logging in as', data.user.email);
+      setSession(data.session);
+      await fetchUserProfile(data.user);
     }
-    
+
     return { data, error };
   };
 
@@ -98,6 +115,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const register = async (email: string, password: string, name: string, phone: string, role: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          phone,
+          role,
+        },
+      },
+    });
+
+    // Note: You should handle profile creation trigger on the backend or here if no trigger exists.
+    // Assuming a trigger exists on auth.users insert to create profile.
+
+    return { data, error };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -106,6 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated: !!user,
         login,
         logout,
+        register,
       }}
     >
       {children}

@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Dynamically determine backend URL based on current window location
 const getBaseUrl = () => {
@@ -16,6 +15,12 @@ const getBaseUrl = () => {
   // REPLACE THIS WITH YOUR MACHINE'S LOCAL IP ADDRESS
   return 'http://192.168.16.108:3000';
 };
+
+export interface SupabaseResponse<T = unknown> {
+  data: T | null;
+  error: unknown | null;
+  count: number | null;
+}
 
 const BASE_URL = getBaseUrl();
 
@@ -37,36 +42,45 @@ class QueryBuilder {
     this.headers = { 'Content-Type': 'application/json' };
   }
 
-  select(cols: any = '*') {
+  select(cols: string = '*', options: { count?: string; head?: boolean } = {}) {
     this.queryParams.append('select', cols);
+    // Store options to handle count/head later
+    if (options.count) {
+      this.queryParams.append('count', options.count);
+    }
+    if (options.head) {
+      this.method = 'HEAD';
+    }
     return this;
   }
 
-  eq(column: any, value: any) {
+  eq(column: string, value: string | number | boolean) {
     this.queryParams.append(column, `eq.${value}`);
     return this;
   }
 
-  neq(column: any, value: any) {
-    this.queryParams.append(column, `neq.${value}`);
-    return this;
-  }
-
-  order(column: any, options: any = {}) {
-    const { ascending = true } = options;
-    this.queryParams.append('order', `${column}.${ascending ? 'asc' : 'desc'}`);
-    return this;
-  }
-
-  in(column: any, values: any[]) {
+  in(column: string, values: (string | number)[]) {
     // Supabase format: col=in.(val1,val2)
+    // Local backend simplified: we might need to handle this manually in server.js applyFilters or loop
+    // For now generating the param:
     const valString = `(${values.join(',')})`;
     this.queryParams.append(column, `in.${valString}`);
     return this;
   }
 
-  limit(count: any) {
-    this.queryParams.append('limit', count);
+  neq(column: string, value: string | number | boolean) {
+    this.queryParams.append(column, `neq.${value}`);
+    return this;
+  }
+
+  order(column: string, options: { ascending?: boolean } = {}) {
+    const { ascending = true } = options;
+    this.queryParams.append('order', `${column}.${ascending ? 'asc' : 'desc'}`);
+    return this;
+  }
+
+  limit(count: number) {
+    this.queryParams.append('limit', count.toString());
     return this;
   }
 
@@ -76,26 +90,26 @@ class QueryBuilder {
   }
 
   // Insert
-  insert(data: any) {
+  insert(data: unknown) {
     this.method = 'POST';
     this.body = JSON.stringify(data);
     return this;
   }
 
   // Update
-  update(data: any) {
+  update(data: unknown) {
     this.method = 'PATCH';
     this.body = JSON.stringify(data);
     return this;
   }
 
   // File Upload (mock)
-  upload(path: any, file: any) {
+  upload(path: string, _file: BodyInit | null) {
     // Not fully implemented in local backend yet, returning fake url
-    return Promise.resolve({ data: { path }, error: null as any });
+    return Promise.resolve({ data: { path }, error: null as unknown });
   }
 
-  getPublicUrl(path: any) {
+  getPublicUrl(_path: string) {
     return { data: { publicUrl: 'https://via.placeholder.com/150' } };
   }
 
@@ -106,7 +120,7 @@ class QueryBuilder {
       return {
         upload: this.upload,
         getPublicUrl: this.getPublicUrl,
-        from: (bucket: any) => this // chaining hack
+        from: (_bucket: string) => this // chaining hack
       };
     }
 
@@ -116,31 +130,45 @@ class QueryBuilder {
     }
 
     try {
+      // If method is HEAD, we can't use db.all easily via the REST API unless the API supports it.
+      // My minimal server.js might not support HEAD or returning count in headers.
+      // Strategy: Use GET, fetch data, and return length as count. 
+      // This is inefficient but works for local dev.
+      const fetchMethod = this.method === 'HEAD' ? 'GET' : this.method;
+
       const res = await fetch(url, {
-        method: this.method,
+        method: fetchMethod,
         headers: this.headers,
         body: this.body
       });
 
       const data = await res.json();
 
+      let count: number | null = null;
+      if (Array.isArray(data)) {
+        count = data.length;
+      }
+
       if (!res.ok) {
-        return { data: null, error: data };
+        return { data: null, error: data, count: null };
       } else {
         if (this.isSingle && Array.isArray(data)) {
-          return { data: data[0] || null, error: null };
+          return { data: data[0] || null, error: null, count };
         } else {
-          return { data, error: null };
+          // If HEAD was requested, data should be null? Supabase returns null data for HEAD?
+          // Actually, if head: true, we just want count.
+          const finalData = this.method === 'HEAD' ? null : data;
+          return { data: finalData, error: null, count };
         }
       }
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error, count: null };
     }
   }
 
-  then<TResult1 = any, TResult2 = never>(
-    onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  then<TResult1 = SupabaseResponse, TResult2 = never>(
+    onfulfilled?: ((value: SupabaseResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
@@ -165,7 +193,7 @@ export const supabase = {
   // Auth Namespace
   // Auth Namespace
   auth: {
-    signInWithPassword: async ({ email, password }: any) => {
+    signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
       try {
         const response = await fetch(`${BASE_URL}/auth/v1/token`, {
           method: 'POST',
@@ -176,13 +204,16 @@ export const supabase = {
         if (!response.ok) {
           return { data: { user: null, session: null }, error: data };
         }
-        await AsyncStorage.setItem('sb-session', JSON.stringify(data));
+        // Persist session
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sb-session', JSON.stringify(data));
+        }
         return { data: { user: data.user, session: data }, error: null };
-      } catch (e: any) {
+      } catch (e: unknown) {
         return { data: { user: null, session: null }, error: e };
       }
     },
-    signUp: async ({ email, password, options }: any) => {
+    signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: unknown } }) => {
       try {
         const response = await fetch(`${BASE_URL}/auth/v1/signup`, {
           method: 'POST',
@@ -193,29 +224,37 @@ export const supabase = {
         if (!response.ok) {
           return { data: { user: null, session: null }, error: data };
         }
-        await AsyncStorage.setItem('sb-session', JSON.stringify(data));
+        // Persist session
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sb-session', JSON.stringify(data));
+        }
         return { data: { user: data.user, session: data }, error: null };
-      } catch (e: any) {
+      } catch (e: unknown) {
         return { data: { user: null, session: null }, error: e };
       }
     },
     signOut: async () => {
-      await AsyncStorage.removeItem('sb-session');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('sb-session');
+      }
       return { error: null };
     },
     getSession: async () => {
-      try {
-        const stored = await AsyncStorage.getItem('sb-session');
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('sb-session');
         if (stored) {
-          const session = JSON.parse(stored);
-          return { data: { session }, error: null };
+          try {
+            const session = JSON.parse(stored);
+            return { data: { session }, error: null };
+          } catch (e) {
+            console.error("Failed to parse session", e);
+            localStorage.removeItem('sb-session');
+          }
         }
-      } catch (e) {
-        // ignore
       }
       return { data: { session: null }, error: null };
     },
-    onAuthStateChange: (callback: any) => {
+    onAuthStateChange: (_callback: unknown) => {
       // Simple stub. In a real app we'd trigger this on login/logout.
       // For now, AuthContext handles the state updates manually.
       return { data: { subscription: { unsubscribe: () => { } } } };
@@ -223,25 +262,25 @@ export const supabase = {
   },
 
   // DB Namespace
-  from: (table: any) => {
+  from: (table: string) => {
     return new QueryBuilder(table);
   },
 
   // Storage Namespace
   storage: {
-    from: (bucket: any) => {
+    from: (_bucket: string) => {
       return new QueryBuilder('storage'); // Hacky
     }
   },
 
   // AI Functions
   functions: {
-    invoke: async (functionName: string, { body }: any) => {
+    invoke: async (functionName: string, { body }: { body: BodyInit | null | undefined }) => {
       if (functionName === 'analyze-image') {
         try {
           // Check if body is FormData (image upload)
           const isFormData = body instanceof FormData;
-          const headers: any = {};
+          const headers: Record<string, string> = {};
           if (!isFormData) {
             headers['Content-Type'] = 'application/json';
           }
@@ -262,3 +301,4 @@ export const supabase = {
     }
   }
 };
+

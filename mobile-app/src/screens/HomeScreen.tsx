@@ -1,10 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useCallback, useEffect, useState } from 'react'; // --- [CHANGE] --- Added useState, useEffect, useCallback
+
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Image,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -12,21 +14,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 
-// --- [CHANGE] --- Import Supabase and Auth
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-
 import { useLanguage } from '../contexts/LanguageContext';
-// --- [CHANGE] --- Removed Report context, we'll fetch live data
-// import { Report, useReports } from '../contexts/ReportsContext';
-import { RootStackParamList } from '../navigation/types';
+import { supabase } from '../lib/supabase';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { RootStackParamList, MainTabParamList } from '../navigation/types';
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
+type HomeScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Home'>,
+  StackNavigationProp<RootStackParamList>
+>;
 
-// --- [CHANGE] --- Define the Issue type based on your Supabase table
 export type Issue = {
   id: string;
   created_at: string;
@@ -34,7 +38,7 @@ export type Issue = {
   title: string;
   description: string;
   issue_type: string;
-  location: any; // geography type
+  location: any;
   address_text: string;
   image_url: string;
   status: 'Reported' | 'Assigned' | 'In Progress' | 'Resolved' | 'Rejected';
@@ -42,50 +46,47 @@ export type Issue = {
   assigned_to: string;
 };
 
-// --- Carousel Data (Unchanged) ---
 const carouselItems = [
-    {
-        title: 'Report an Issue',
-        description: 'Submit a new complaint with photos and location.',
-        icon: 'alert-triangle',
-        screen: 'Report',
-        color: '#FFDDC1'
-    },
-    {
-        title: 'Track Your Reports',
-        description: 'Check the live status of all your submissions.',
-        icon: 'clipboard',
-        screen: 'Track',
-        color: '#C2EABD'
-    },
-    {
-        title: 'Safety Guidance',
-        description: 'Read Do’s & Don’ts and find emergency contacts.',
-        icon: 'book-open',
-        screen: 'Guidance',
-        color: '#D1E8FF'
-    }
+  {
+    title: 'Report an Issue',
+    description: 'Submit a new complaint with photos and location.',
+    icon: 'alert-triangle',
+    screen: 'Report',
+    colors: ['#FF6B6B', '#EE5253'] as const
+  },
+  {
+    title: 'Track Status',
+    description: 'Check the live status of all your submissions.',
+    icon: 'activity',
+    screen: 'Track',
+    colors: ['#4ECDC4', '#26A69A'] as const
+  },
+  {
+    title: 'Safety Guide',
+    description: 'Read Do’s & Don’ts and find emergency contacts.',
+    icon: 'shield',
+    screen: 'Guidance',
+    colors: ['#54A0FF', '#2E86DE'] as const
+  }
 ];
 
 const HomeScreen = () => {
-  // --- [CHANGE] --- Use auth to get user and state for reports/loading
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [reports, setReports] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- [CHANGE] --- Fetch reports from Supabase
   const fetchReports = useCallback(async () => {
-    if (!user) return; // Wait for user to be available
+    if (!user) return;
 
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('issues')
         .select('*')
-        .eq('citizen_id', user.id) // Get reports for this user
-        .order('created_at', { ascending: false }); // Show newest first
+        .eq('citizen_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
@@ -93,215 +94,321 @@ const HomeScreen = () => {
       setReports(data || []);
     } catch (error: any) {
       console.error('Error fetching reports:', error.message);
-      // You might want to show an alert here
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  // --- [CHANGE] --- Call fetchReports on mount (and when user changes)
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
 
-
-  // --- [CHANGE] --- Updated status to match your table's 'Reported' default
   const getStatusStyle = (status: Issue['status']) => {
-    if (status === 'Resolved') return { badge: styles.statusResolved, text: styles.statusTextResolved };
-    if (status === 'In Progress') return { badge: styles.statusInProgress, text: styles.statusTextInProgress };
-    if (status === 'Assigned') return { badge: styles.statusAssigned, text: styles.statusTextAssigned };
-    // Default is 'Reported'
-    return { badge: styles.statusReported, text: styles.statusTextReported };
+    if (status === 'Resolved') return { bg: '#D1FAE5', text: '#065F46', icon: 'check-circle' };
+    if (status === 'In Progress') return { bg: '#FEF3C7', text: '#92400E', icon: 'clock' };
+    if (status === 'Assigned') return { bg: '#E0F2FE', text: '#075985', icon: 'user-check' };
+    return { bg: '#F3F4F6', text: '#1F2937', icon: 'alert-circle' };
   };
 
-  // --- [CHANGE] --- Updated renderItem to use 'Issue' type fields
-  const renderReportItem = ({ item }: { item: Issue }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('ReportDetail', { reportId: item.id })}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.issue_type}</Text>
-        <View style={[styles.statusBadge, getStatusStyle(item.status).badge]}>
-          <Text style={getStatusStyle(item.status).text}>
-            {t(`status_${item.status.toLowerCase().replace(' ', '_')}` as any)}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.locationContainer}>
-        <Icon name="map-pin" size={14} color="#6B7280" />
-        <Text style={styles.cardLocation} numberOfLines={1}>{item.address_text}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // --- Header component (Unchanged) ---
-  const ListHeader = () => (
-    <>
-      <Text style={styles.welcomeTitle}>Welcome to Urja Setu</Text>
-      <Text style={styles.welcomeSubtitle}>Your partner in building a better Ahmedabad.</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.carouselContainer}
+  const renderReportItem = ({ item }: { item: Issue }) => {
+    const statusStyle = getStatusStyle(item.status);
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('ReportDetail', { reportId: item.id })}
+        activeOpacity={0.7}
       >
-        {carouselItems.map((item, index) => (
-            <TouchableOpacity key={index} style={[styles.carouselCard, {backgroundColor: item.color}]} onPress={() => navigation.navigate(item.screen as any)}>
-                <Icon name={item.icon} size={28} color="#1F2937"/>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconContainer}>
+            <Icon name="map-pin" size={18} color="#1e3c72" />
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.issue_type}</Text>
+            <Text style={styles.cardDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[styles.statusText, { color: statusStyle.text }]}>
+              {item.status}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.cardBody}>
+          <Text style={styles.cardAddress} numberOfLines={2}>{item.address_text}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const ListHeader = () => (
+    <View style={styles.headerContainer}>
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={['#1e3c72', '#2a5298']}
+        style={styles.gradientHeader}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Citizen'} 👋</Text>
+            <Text style={styles.subGreeting}>How can we help today?</Text>
+          </View>
+          <TouchableOpacity style={styles.profileButton}>
+            <Icon name="user" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Actions Carousel */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carouselContainer}
+          style={styles.carouselScrollView}
+        >
+          {carouselItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => navigation.navigate(item.screen as any)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={item.colors}
+                style={styles.carouselCard}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.carouselIconCircle}>
+                  <Icon name={item.icon} size={24} color="#fff" />
+                </View>
                 <Text style={styles.carouselTitle}>{item.title}</Text>
-                <Text style={styles.carouselDescription}>{item.description}</Text>
+                <Text style={styles.carouselDescription} numberOfLines={2}>{item.description}</Text>
+              </LinearGradient>
             </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <Text style={styles.listTitle}>{t('home_title')}</Text>
-    </>
+          ))}
+        </ScrollView>
+      </LinearGradient>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent Activities</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Track')}>
+          <Text style={styles.seeAll}>See All</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
-  // --- [CHANGE] --- Added ListEmptyComponent, onRefresh, and refreshing
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1e3c72" />
       <FlatList
         data={reports}
         renderItem={renderReportItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         ListHeaderComponent={ListHeader}
-        // Add pull-to-refresh
-        onRefresh={fetchReports}
-        refreshing={loading}
-        // Show a message if loading or if list is empty
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={fetchReports} colors={['#1e3c72']} />
+        }
         ListEmptyComponent={() => (
           <View style={styles.emptyListContainer}>
             {loading ? (
-              <ActivityIndicator size="large" color="#0056b3" />
+              <ActivityIndicator size="large" color="#1e3c72" />
             ) : (
-              <Text style={styles.emptyListText}>You have no submitted reports.</Text>
+              <>
+                <Image
+                  source={{ uri: 'https://cdn-icons-png.flaticon.com/512/7486/7486744.png' }}
+                  style={{ width: 120, height: 120, opacity: 0.5, marginBottom: 16 }}
+                />
+                <Text style={styles.emptyListText}>No recent reports found.</Text>
+                <Text style={styles.emptyListSubText}>Your submitted issues will appear here.</Text>
+              </>
             )}
           </View>
         )}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
-// --- [CHANGE] --- Added styles for Reported, Assigned, and Empty List
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F1F5F9',
   },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40, // Added padding at bottom
+  gradientHeader: {
+    paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 20 : 60,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 8,
+    shadowColor: '#1e3c72',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  welcomeTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#111827',
-    paddingHorizontal: 8,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    paddingHorizontal: 8,
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
     marginBottom: 24,
+  },
+  greeting: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  subGreeting: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  carouselScrollView: {
+    paddingLeft: 24,
   },
   carouselContainer: {
-    paddingLeft: 8,
-    paddingRight: 16,
-    marginBottom: 24,
+    paddingRight: 24,
+    paddingBottom: 10,
   },
   carouselCard: {
-    width: Dimensions.get('window').width * 0.6,
-    height: 180,
-    borderRadius: 16,
+    width: 150,
+    height: 170,
+    borderRadius: 20,
     padding: 16,
-    marginRight: 12,
+    marginRight: 16,
     justifyContent: 'space-between',
     elevation: 4,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }
+  },
+  carouselIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   carouselTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: '#1F2937',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 12,
   },
   carouselDescription: {
-      fontSize: 14,
-      color: '#4B5563',
-      lineHeight: 20,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 16,
   },
-  listTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-  },
-  cardHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e3c72',
+  },
+  listContainer: {
+    paddingBottom: 40,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#64748B',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  cardIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  cardHeaderText: {
+    flex: 1
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    flexShrink: 1,
-    marginRight: 8,
+    fontWeight: '700',
+    color: '#1e293b',
   },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cardLocation: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 6,
+  cardDate: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
-  statusResolved: { backgroundColor: '#D1FAE5' },
-  statusTextResolved: { color: '#065F46', fontWeight: '600', fontSize: 12 },
-  
-  statusInProgress: { backgroundColor: '#FEF3C7' }, // Was In Progress
-  statusTextInProgress: { color: '#92400E', fontWeight: '600', fontSize: 12 },
-  
-  statusAssigned: { backgroundColor: '#FEF9C3' }, // New for Assigned
-  statusTextAssigned: { color: '#854D0E', fontWeight: '600', fontSize: 12 },
-
-  statusReported: { backgroundColor: '#DBEAFE' }, // Was Submitted
-  statusTextReported: { color: '#1E40AF', fontWeight: '600', fontSize: 12 },
-  
-  // New styles for empty list
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  cardBody: {
+    paddingLeft: 48
+  },
+  cardAddress: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
   emptyListContainer: {
-    marginTop: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 40,
   },
   emptyListText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#475569',
   },
+  emptyListSubText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginTop: 4
+  },
+  headerContainer: {
+    marginBottom: 8
+  }
 });
 
 export default HomeScreen;

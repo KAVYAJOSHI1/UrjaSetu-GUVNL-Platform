@@ -78,7 +78,7 @@ const ProofOfWorkScreen = () => {
             const { data: urlData } = supabase.storage
                 .from('proof-images')
                 .getPublicUrl(uploadData.path);
-            
+
             const publicImageUrl = urlData.publicUrl;
 
             // --- Step 3: Insert into 'proof_of_work' table ---
@@ -98,7 +98,7 @@ const ProofOfWorkScreen = () => {
             // --- Step 4: Update 'issues' table status to 'Resolved' ---
             const { error: updateError } = await supabase
                 .from('issues')
-                .update({ status: 'Resolved' })
+                .update({ status: 'resolved' })
                 .eq('id', taskId);
 
             if (updateError) {
@@ -106,7 +106,7 @@ const ProofOfWorkScreen = () => {
             }
 
             // --- Step 5: Success! Navigate back ---
-            navigation.navigate('TechnicianMain');
+            navigation.navigate('TechnicianMain', { screen: 'TechnicianDashboard' });
 
         } catch (error: any) {
             console.error("Submission failed:", error.message);

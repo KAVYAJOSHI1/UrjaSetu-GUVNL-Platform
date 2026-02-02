@@ -84,7 +84,7 @@ const translations = {
     issue_short_circuit: 'Short Circuit',
     issue_broken_meter: 'Broken Meter Box',
     issue_exposed_wires: 'Exposed Wires',
-    
+
     // Suggestions Screen
     suggestions_title: 'Community Ideas',
     suggestions_author_prefix: 'by',
@@ -100,7 +100,7 @@ const translations = {
     priority_display_high: 'High Priority',
     priority_display_medium: 'Medium Priority',
     priority_display_low: 'Low Priority',
-    
+
     // QR Scan Screen
     qr_scan_title: 'Scan Asset QR Code',
     qr_scan_subtitle: 'Point your camera at the QR code on the electrical asset.',
@@ -174,6 +174,14 @@ const translations = {
     emergency_helpline_1: "Electricity Helpline (1912)",
     emergency_helpline_2: "Ambulance (108)",
     emergency_helpline_3: "Fire & Rescue (101)",
+    submitting_btn_text: "Submitting...",
+    tech_nav_dashboard: "Dashboard",
+    tech_nav_map: "Map",
+    tech_nav_profile: "Profile",
+    error_title: "Error",
+    suggestions_user_error: "User not identified.",
+    suggestions_empty: "No suggestions yet.",
+    priority: "Priority",
 
   },
   gu: { // Gujarati Translations
@@ -348,6 +356,14 @@ const translations = {
     emergency_helpline_1: "વીજળી હેલ્પલાઇન (૧૯૧૨)",
     emergency_helpline_2: "એમ્બ્યુલન્સ (૧૦૮)",
     emergency_helpline_3: "ફાયર અને બચાવ (૧૦૧)",
+    submitting_btn_text: "સબમિટ કરી રહ્યું છે...",
+    tech_nav_dashboard: "ડેશબોર્ડ",
+    tech_nav_map: "નકશો",
+    tech_nav_profile: "પ્રોફાઇલ",
+    error_title: "ભૂલ",
+    suggestions_user_error: "વપરાશકર્તા ઓળખાયેલ નથી.",
+    suggestions_empty: "હજુ સુધી કોઈ સૂચનો નથી.",
+    priority: "પ્રાધાન્યતા",
   },
 };
 

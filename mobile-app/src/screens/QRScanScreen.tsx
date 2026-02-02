@@ -3,24 +3,24 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Easing,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useLanguage } from '../contexts/LanguageContext';
 import { RootStackParamList } from '../navigation/types';
 
-type QRScanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
+import { RootStackNavigationProp } from '../navigation/types';
 
 const QRScanScreen = () => {
   const { t } = useLanguage();
-  const navigation = useNavigation<QRScanScreenNavigationProp>();
+  const navigation = useNavigation<RootStackNavigationProp>();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const isFocused = useIsFocused(); // Hook to check if the screen is active
@@ -93,7 +93,7 @@ const QRScanScreen = () => {
       ]
     );
   };
-  
+
   const animatedStyle = {
     transform: [
       {
@@ -120,11 +120,11 @@ const QRScanScreen = () => {
         <Text style={styles.title}>{t('qr_scan_title')}</Text>
         <Text style={styles.subtitle}>{t('qr_scan_subtitle')}</Text>
         <View style={styles.scannerBox}>
-            <Animated.View style={[styles.scanLine, animatedStyle]} />
+          <Animated.View style={[styles.scanLine, animatedStyle]} />
         </View>
-        <TouchableOpacity style={styles.helpButton} onPress={() => navigation.navigate('Guidance')}>
-            <Icon name="help-circle" size={20} color="#FFF"/>
-            <Text style={styles.helpButtonText}>{t('need_help_btn')}</Text>
+        <TouchableOpacity style={styles.helpButton} onPress={() => navigation.navigate('Main', { screen: 'Guidance' })}>
+          <Icon name="help-circle" size={20} color="#FFF" />
+          <Text style={styles.helpButtonText}>{t('need_help_btn')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

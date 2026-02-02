@@ -22,17 +22,17 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
 
   const handleSubmit = () => {
     if (!name || !email || !phone || !password) {
-        Alert.alert("Input Error", "Please fill all fields.");
-        return;
+      Alert.alert("Input Error", "Please fill all fields.");
+      return;
     }
-    register(name, email, phone, password);
+    register(email, password, name, phone, 'citizen');
     Alert.alert("Success", t('toast_register_success'));
     navigation.navigate('Login');
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >

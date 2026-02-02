@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,64 +13,73 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { RootStackNavigationProp } from '../../navigation/types';
-// 👇 1. Import your Supabase client
 import { supabase } from '../../lib/supabase';
-// 👇 2. Import your reusable header
+import { useRealtime } from '../../hooks/useRealtime';
 import TechnicianHeader from '../../components/TechnicianHeader';
 
-// 👇 3. Define a Type for your 'issues' table data
 export type TechnicianTask = {
   id: string;
   created_at: string;
   title: string;
   issue_type: string;
   address_text: string;
-  status: 'Reported' | 'Assigned' | 'In Progress' | 'Resolved' | 'Rejected';
+  status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'pending';
   priority: 'Low' | 'Medium' | 'High';
-  // ...add any other fields you select
 };
 
 const TechnicianDashboardScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp<'TechnicianMain'>>();
-  const { t } = useLanguage();
   const { user } = useAuth();
 
-  // 👇 4. State for loading and tasks
+  // Tab State: 'active' or 'history'
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [tasks, setTasks] = useState<TechnicianTask[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 👇 5. Function to fetch tasks from Supabase
   const fetchTasks = useCallback(async () => {
-    if (!user) return; // Wait for the user to be loaded
+    if (!user) return;
 
     setLoading(true);
     try {
-      // Fetch issues assigned to this user that are not yet Resolved
-      const { data, error } = await supabase
+      let query = supabase
         .from('issues')
         .select('*')
         .eq('assigned_to', user.id)
-        .neq('status', 'Resolved') // '!=' (not equal)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (activeTab === 'active') {
+        // Active = assigned, in_progress, pending
+        // using neon/postgres syntax if available, otherwise client side filter or multiple queries
+        // Supabase .in() is cleaner
+        query = query.in('status', ['assigned', 'in_progress', 'pending', 'open']);
+      } else {
+        // History = resolved
+        query = query.eq('status', 'resolved');
       }
-      setTasks(data || []);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setTasks((data as any[]) || []);
     } catch (error: any) {
       console.error('Error fetching tasks:', error.message);
-      alert('Failed to fetch tasks.');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, activeTab]);
 
-  // 👇 6. Fetch tasks on initial load and when user changes
-  useEffect(() => {
+  // Use focus effect to refresh when coming back from details
+  useFocusEffect(
+    useCallback(() => {
+      fetchTasks();
+    }, [fetchTasks])
+  );
+
+  // Real-time updates
+  useRealtime('issues', () => {
     fetchTasks();
-  }, [fetchTasks]);
+  });
 
-  // (This helper function is unchanged)
   const getPriorityStyle = (priority: TechnicianTask['priority']) => {
     if (priority === 'High') return { bar: styles.priorityBarHigh, text: styles.priorityTextHigh, icon: 'alert-triangle', iconColor: '#EF4444' };
     if (priority === 'Medium') return { bar: styles.priorityBarMedium, text: styles.priorityTextMedium, icon: 'alert-circle', iconColor: '#F59E0B' };
@@ -81,37 +90,56 @@ const TechnicianDashboardScreen = () => {
     const priorityStyle = getPriorityStyle(item.priority);
 
     return (
-      // (Animated.View removed for simplicity, you can add it back)
-        <TouchableOpacity
-          style={styles.card}
-          // 👇 7. Navigate with the Supabase item 'id'
-          onPress={() => navigation.navigate('TechnicianIssueDetail', { taskId: item.id })}>
-          <View style={[styles.priorityBar, priorityStyle.bar]} />
-          <View style={styles.cardContent}>
-            {/* 👇 8. Use column names from your 'issues' table */}
-            <Text style={styles.cardTitle}>{item.issue_type}</Text>
-            <View style={styles.locationContainer}>
-              <Icon name="map-pin" size={14} color="#6B7280" />
-              <Text style={styles.cardLocation}>{item.address_text}</Text>
-            </View>
-            <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{item.status}</Text>
-            </View>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('TechnicianIssueDetail', { taskId: item.id })}>
+        <View style={[styles.priorityBar, priorityStyle.bar]} />
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{item.issue_type}</Text>
+          <View style={styles.locationContainer}>
+            <Icon name="map-pin" size={14} color="#6B7280" />
+            <Text style={styles.cardLocation} numberOfLines={1}>{item.address_text}</Text>
           </View>
-          <View style={styles.priorityContainer}>
-            <Icon name={priorityStyle.icon} size={20} color={priorityStyle.iconColor} />
-            <Text style={[styles.priorityText, priorityStyle.text]}>{item.priority}</Text>
+          <View style={[styles.statusBadge,
+          item.status === 'pending' ? { backgroundColor: '#FEF3C7' } :
+            item.status === 'resolved' ? { backgroundColor: '#D1FAE5' } : {}
+          ]}>
+            <Text style={[styles.statusBadgeText,
+            item.status === 'pending' ? { color: '#B45309' } :
+              item.status === 'resolved' ? { color: '#065F46' } : {}
+            ]}>
+              {item.status.toUpperCase().replace('_', ' ')}
+            </Text>
           </View>
-        </TouchableOpacity>
+        </View>
+        <View style={styles.priorityContainer}>
+          <Icon name={priorityStyle.icon} size={20} color={priorityStyle.iconColor} />
+          <Text style={[styles.priorityText, priorityStyle.text]}>{item.priority}</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 👇 9. Use your simplified header */}
       <TechnicianHeader userName={user?.name || 'Technician'} />
-      
-      {/* 👇 10. Show a loading indicator while fetching */}
+
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'active' && styles.activeTab]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active Tasks</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'history' && styles.activeTab]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>History</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color="#059669" />
@@ -124,11 +152,15 @@ const TechnicianDashboardScreen = () => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                  <Icon name="check-square" size={60} color="#D1D5DB" />
-                  <Text style={styles.emptyText}>No tasks assigned.</Text>
-                  <Text style={styles.emptySubText}>Check back later for new assignments.</Text>
-              </View>
+            <View style={styles.emptyContainer}>
+              <Icon name="check-square" size={60} color="#D1D5DB" />
+              <Text style={styles.emptyText}>
+                {activeTab === 'active' ? 'No active tasks.' : 'No completed history.'}
+              </Text>
+              <Text style={styles.emptySubText}>
+                {activeTab === 'active' ? 'Check back for new assignments.' : 'Your resolved tasks will appear here.'}
+              </Text>
+            </View>
           }
         />
       )}
@@ -136,66 +168,89 @@ const TechnicianDashboardScreen = () => {
   );
 };
 
-// --- Styles (Slightly adjusted for loading) ---
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FF' },
-    listContainer: { padding: 20 },
-    card: {
-        flexDirection: 'row',
-        backgroundColor: 'white',
-        borderRadius: 16,
-        marginBottom: 16,
-        shadowColor: '#1F2937',
-        shadowOpacity: 0.08,
-        shadowRadius: 15,
-        shadowOffset: { width: 0, height: 5 },
-        elevation: 5,
-        overflow: 'hidden',
-    },
-    priorityBar: { width: 8 },
-    priorityBarHigh: { backgroundColor: '#EF4444' },
-    priorityBarMedium: { backgroundColor: '#F59E0B' },
-    priorityBarLow: { backgroundColor: '#6B7280' },
-    cardContent: { flex: 1, padding: 20 },
-    cardTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
-    locationContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-    cardLocation: { fontSize: 14, color: '#6B7280', marginLeft: 6, flexShrink: 1 },
-    priorityContainer: { justifyContent: 'center', alignItems: 'center', paddingRight: 20, width: 80},
-    priorityText: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-    priorityTextHigh: { color: '#EF4444' },
-    priorityTextMedium: { color: '#F59E0B' },
-    priorityTextLow: { color: '#6B7280' },
-    statusBadge: {
-        marginTop: 12,
-        backgroundColor: '#E5E7EB',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        alignSelf: 'flex-start'
-    },
-    statusBadgeText: {
-        color: '#374151',
-        fontSize: 12,
-        fontWeight: '600'
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 100
-    },
-    emptyText: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#4B5563',
-        marginTop: 16
-    },
-    emptySubText: {
-        fontSize: 14,
-        color: '#9CA3AF',
-        marginTop: 8,
-        textAlign: 'center'
-    }
+  container: { flex: 1, backgroundColor: '#F8F9FF' },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#059669',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: '#059669',
+  },
+  listContainer: { padding: 20 },
+  card: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#1F2937',
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  priorityBar: { width: 6 },
+  priorityBarHigh: { backgroundColor: '#EF4444' },
+  priorityBarMedium: { backgroundColor: '#F59E0B' },
+  priorityBarLow: { backgroundColor: '#6B7280' },
+  cardContent: { flex: 1, padding: 16 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  cardLocation: { fontSize: 13, color: '#6B7280', marginLeft: 4, flex: 1 },
+  priorityContainer: { justifyContent: 'center', alignItems: 'center', paddingRight: 16, width: 70 },
+  priorityText: { fontSize: 10, fontWeight: 'bold', marginTop: 4 },
+  priorityTextHigh: { color: '#EF4444' },
+  priorityTextMedium: { color: '#F59E0B' },
+  priorityTextLow: { color: '#6B7280' },
+  statusBadge: {
+    marginTop: 8,
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start'
+  },
+  statusBadgeText: {
+    color: '#374151',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 60
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginTop: 16
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center'
+  }
 });
 
 export default TechnicianDashboardScreen;

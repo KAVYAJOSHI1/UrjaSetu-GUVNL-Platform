@@ -97,8 +97,8 @@ const ReportScreen = () => {
     try {
       let position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       // --- ADDED --- Store the coordinates object
-      setCoords(position.coords); 
-      
+      setCoords(position.coords);
+
       let reverseGeocode = await Location.reverseGeocodeAsync(position.coords);
 
       if (reverseGeocode[0]) {
@@ -118,12 +118,38 @@ const ReportScreen = () => {
   // (classifyImage function is unchanged)
   const classifyImage = async (uri: string) => {
     setIsClassifying(true);
-    setTimeout(() => {
-      const detectedAppliance = "Damaged Transformer";
-      setIssueType(detectedAppliance);
+
+    try {
+      const fileExt = uri.split('.').pop();
+      const fileName = `temp_${Date.now()}.${fileExt}`;
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: uri,
+        name: fileName,
+        type: `image/${fileExt}`,
+      } as any);
+
+      const { data, error } = await supabase.functions.invoke('analyze-image', {
+        body: formData
+      });
+
+      if (error) throw error;
+
+      if (data && data.prediction) {
+        setIssueType(data.prediction);
+        setDescription(data.description || description);
+        if (data.priority) setPriority(data.priority);
+
+        Alert.alert('AI Diagnosis Complete', `Detected: ${data.prediction}\nConfidence: ${data.confidence}%`);
+      }
+
+    } catch (e: any) {
+      console.log("AI Analysis failed:", e);
+      // Fallback or silent fail
+    } finally {
       setIsClassifying(false);
-      Alert.alert(t('ai_success_title'), `${t('ai_success_message')} ${detectedAppliance}`);
-    }, 2000);
+    }
   };
 
   // --- ADDED --- Helper function to reset the form
@@ -157,22 +183,22 @@ const ReportScreen = () => {
 
         const formData = new FormData();
         formData.append('file', {
-            uri: imageUri,
-            name: fileName,
-            type: `image/${fileExt}`,
+          uri: imageUri,
+          name: fileName,
+          type: `image/${fileExt}`,
         } as any);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('issue-images') // Use the bucket you created
-            .upload(filePath, formData);
-        
+          .from('issue-images') // Use the bucket you created
+          .upload(filePath, formData);
+
         if (uploadError) throw new Error(uploadError.message);
 
         // Get the public URL
         const { data: urlData } = supabase.storage
-            .from('issue-images')
-            .getPublicUrl(uploadData.path);
-        
+          .from('issue-images')
+          .getPublicUrl(uploadData.path);
+
         publicImageUrl = urlData.publicUrl;
       }
 
@@ -275,18 +301,18 @@ const ReportScreen = () => {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.headerContainer}>
-             <Text style={styles.title}>File a Complaint</Text>
-             <TouchableOpacity style={styles.sosButton} onPress={() => setEmergencyModalVisible(true)}>
-                <Icon name="alert-octagon" size={24} color="#FFF"/>
-                <Text style={styles.sosButtonText}>SOS</Text>
-             </TouchableOpacity>
+            <Text style={styles.title}>File a Complaint</Text>
+            <TouchableOpacity style={styles.sosButton} onPress={() => setEmergencyModalVisible(true)}>
+              <Icon name="alert-octagon" size={24} color="#FFF" />
+              <Text style={styles.sosButtonText}>SOS</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.card}>
             {/* (Steps 1, 2, 3 are unchanged) */}
             <View style={styles.stepContainer}>
-                <View style={styles.stepIcon}><Text style={styles.stepText}>1</Text></View>
-                <Text style={styles.stepTitle}>Add a Photo</Text>
+              <View style={styles.stepIcon}><Text style={styles.stepText}>1</Text></View>
+              <Text style={styles.stepTitle}>Add a Photo</Text>
             </View>
             <TouchableOpacity style={styles.actionButton} onPress={handleImagePick}>
               <Icon name="camera" size={20} color="#374151" />
@@ -296,8 +322,8 @@ const ReportScreen = () => {
             {imageUri && <Image source={{ uri: imageUri }} style={styles.imagePreview} />}
 
             <View style={styles.stepContainer}>
-                <View style={styles.stepIcon}><Text style={styles.stepText}>2</Text></View>
-                <Text style={styles.stepTitle}>Set Location</Text>
+              <View style={styles.stepIcon}><Text style={styles.stepText}>2</Text></View>
+              <Text style={styles.stepTitle}>Set Location</Text>
             </View>
             <TouchableOpacity style={styles.actionButton} onPress={handleGeotag}>
               <Icon name="map-pin" size={20} color="#374151" />
@@ -306,8 +332,8 @@ const ReportScreen = () => {
             {isGeotagging && <Text style={styles.loadingText}>🛰️ {t('gps_loading_text')}</Text>}
 
             <View style={styles.stepContainer}>
-                <View style={styles.stepIcon}><Text style={styles.stepText}>3</Text></View>
-                <Text style={styles.stepTitle}>Describe the Issue</Text>
+              <View style={styles.stepIcon}><Text style={styles.stepText}>3</Text></View>
+              <Text style={styles.stepTitle}>Describe the Issue</Text>
             </View>
 
             {/* (Form inputs are unchanged) */}
@@ -315,7 +341,7 @@ const ReportScreen = () => {
             <TouchableOpacity style={styles.dropdownButton} onPress={() => setPriorityModalVisible(true)}>
               {priority ? (
                 <>
-                  <Icon name={priorityOptions.find(p => p.value === priority)?.icon || 'circle'} size={20} color={priorityOptions.find(p => p.value === priority)?.color}/>
+                  <Icon name={priorityOptions.find(p => p.value === priority)?.icon || 'circle'} size={20} color={priorityOptions.find(p => p.value === priority)?.color} />
                   <Text style={[styles.dropdownButtonText, { color: priorityOptions.find(p => p.value === priority)?.color }]}>
                     {priority} Priority
                   </Text>
@@ -327,35 +353,35 @@ const ReportScreen = () => {
 
             <Text style={styles.label}>{t('issue_type_label')}</Text>
             <TouchableOpacity style={styles.dropdownButton} onPress={() => setIssueTypeModalVisible(true)}>
-                <Icon name={issueTypeOptions.find(i => i.value === issueType)?.icon || 'alert-triangle'} size={20} color={issueType ? '#111827' : '#9CA3AF'}/>
-                <Text style={[styles.dropdownButtonText, !issueType && styles.dropdownPlaceholder]}>
-                    {issueType || t('select_issue_type_placeholder')}
-                </Text>
+              <Icon name={issueTypeOptions.find(i => i.value === issueType)?.icon || 'alert-triangle'} size={20} color={issueType ? '#111827' : '#9CA3AF'} />
+              <Text style={[styles.dropdownButtonText, !issueType && styles.dropdownPlaceholder]}>
+                {issueType || t('select_issue_type_placeholder')}
+              </Text>
             </TouchableOpacity>
 
             <Text style={styles.label}>{t('location_label')}</Text>
             <View style={styles.inputContainer}>
               <Icon name="map" size={20} color={locationCaptured ? '#10B981' : '#9CA3AF'} style={styles.inputIcon} />
-              <TextInput style={styles.input} placeholder={t('location_placeholder')} value={location} onChangeText={setLocation} editable={!locationCaptured}/>
+              <TextInput style={styles.input} placeholder={t('location_placeholder')} value={location} onChangeText={setLocation} editable={!locationCaptured} />
             </View>
 
             <Text style={styles.label}>{t('description_label')}</Text>
             <View style={styles.inputContainer}>
-               <Icon name="file-text" size={20} color="#9CA3AF" style={styles.inputIcon} />
-               <TextInput style={[styles.input, styles.textArea]} placeholder={t('description_placeholder')} value={description} onChangeText={setDescription} multiline/>
+              <Icon name="file-text" size={20} color="#9CA3AF" style={styles.inputIcon} />
+              <TextInput style={[styles.input, styles.textArea]} placeholder={t('description_placeholder')} value={description} onChangeText={setDescription} multiline />
             </View>
           </View>
 
           {/* --- MODIFIED --- Submit button now shows loading state */}
-          <TouchableOpacity 
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={loading}
           >
             {loading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" style={{marginRight: 10}} />
+              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 10 }} />
             ) : (
-                <Icon name="send" size={20} color="white" style={{marginRight: 10}}/>
+              <Icon name="send" size={20} color="white" style={{ marginRight: 10 }} />
             )}
             <Text style={styles.submitButtonText}>
               {loading ? t('submitting_btn_text') : t('submit_report_btn')}

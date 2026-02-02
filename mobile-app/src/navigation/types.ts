@@ -14,6 +14,7 @@ export type MainTabParamList = {
   Track: undefined;
   Suggestions: undefined;
   Guidance: undefined;
+  QRScan: undefined;
 };
 
 /**
@@ -54,7 +55,10 @@ export type RootStackParamList = {
  * Use this for the `useNavigation` hook.
  * Example: const navigation = useNavigation<RootStackNavigationProp>();
  */
-export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;
+export type RootStackNavigationProp<T extends keyof RootStackParamList = keyof RootStackParamList> = StackNavigationProp<RootStackParamList, T>;
+export type AuthStackNavigationProp = RootStackNavigationProp; // Alias for compatibility
+export type RegisterScreenProps = RootStackScreenProps<'Register'>;
+export type AssetDetailScreenProps = RootStackScreenProps<'AssetDetail'>;
 
 /**
  * A generic type for screen props within the RootStack.

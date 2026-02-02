@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
+import { useRealtime } from '../hooks/useRealtime';
 
 // --- 1. Define the History item type ---
 type StatusHistoryItem = {
@@ -35,10 +36,10 @@ type Issue = {
 
 // --- 3. A new component for the "Journey" timeline ---
 const StatusTimeline = ({ history }: { history: StatusHistoryItem[] }) => {
-  
+
   // Helper to get icon and color for each status
   const getStatusIcon = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'Resolved':
         return { icon: 'check-circle', color: '#10B981' };
       case 'In Progress':
@@ -85,11 +86,11 @@ const TrackScreen = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // --- 5. Update fetchReports to get the history too ---
   const fetchReports = useCallback(async () => {
-    if (!user) return; 
-    
+    if (!user) return;
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -107,10 +108,10 @@ const TrackScreen = () => {
             status
           )
         `)
-        .eq('citizen_id', user.id) 
+        .eq('citizen_id', user.id)
         .order('created_at', { ascending: false }) // Newest reports first
         // Get timeline from oldest to newest
-        .order('created_at', { foreignTable: 'status_history', ascending: true }); 
+        .order('created_at', { foreignTable: 'status_history', ascending: true });
 
       if (error) {
         throw error;
@@ -127,10 +128,14 @@ const TrackScreen = () => {
     fetchReports();
   }, [fetchReports]);
 
+  useRealtime('issues', () => {
+    fetchReports();
+  });
+
   // --- 6. Update RenderItem to show the new card ---
   const renderItem = ({ item }: { item: Issue }) => {
     const formattedDate = new Date(item.created_at).toLocaleDateString();
-    
+
     // We don't use these helpers anymore, but they are here if you want them
     // const statusStyle = getStatusStyle(item.status);
     // const priorityStyle = getPriorityStyle(item.priority);
@@ -149,25 +154,25 @@ const TrackScreen = () => {
           {/* You can still show the current status badge if you want */}
         </View>
         <Text style={s.description} numberOfLines={2}>{item.description}</Text>
-        
+
         {/* --- 7. Render the timeline INSIDE the card --- */}
         <StatusTimeline history={item.status_history} />
       </View>
     );
   };
-  
+
   const EmptyListComponent = () => (
-     <View style={s.emptyContainer}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#6B7280" />
-        ) : (
-          <>
-            <Icon name="clipboard" size={60} color="#9CA3AF" />
-            <Text style={s.emptyTitle}>{t('track_empty_title')}</Text>
-            <Text style={s.emptySubtitle}>{t('track_empty_subtitle')}</Text>
-          </>
-        )}
-     </View>
+    <View style={s.emptyContainer}>
+      {loading ? (
+        <ActivityIndicator size="large" color="#6B7280" />
+      ) : (
+        <>
+          <Icon name="clipboard" size={60} color="#9CA3AF" />
+          <Text style={s.emptyTitle}>{t('track_empty_title')}</Text>
+          <Text style={s.emptySubtitle}>{t('track_empty_subtitle')}</Text>
+        </>
+      )}
+    </View>
   );
 
   return (
@@ -210,11 +215,11 @@ const s = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
   cardSubtitle: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   description: { fontSize: 14, color: '#4B5563', marginTop: 12, lineHeight: 20 },
-  
+
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, minHeight: 400 },
   emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#374151', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#6B7280', marginTop: 8, textAlign: 'center' },
-  
+
   // --- TIMELINE STYLES ---
   timelineContainer: {
     marginTop: 16,
