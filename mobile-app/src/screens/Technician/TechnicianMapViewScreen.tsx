@@ -1,38 +1,82 @@
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useRef, useState } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/Feather';
-import { TechnicianTask, useTechnicianTasks } from '../../contexts/TechnicianTasksContext';
 import { RootStackNavigationProp } from '../../navigation/types';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useRealtime } from '../../hooks/useRealtime';
+
+// Type definition (matching Dashboard)
+type TechnicianTask = {
+    id: string;
+    created_at: string;
+    title: string;
+    issue_type: string;
+    address_text: string;
+    status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'pending';
+    priority: 'Low' | 'Medium' | 'High';
+    image_url: string; // Dashboard calls it imageUrl but DB is likely image_url or similar? Checked Dashboard, it doesn't use image.
+    // Wait, Dashboard doesn't use image. But Map shows cardImage. 
+    // Let's check DB schema or just map it.
+    latitude?: number; // DB might store separate cols or json
+    longitude?: number;
+    location?: string; // Dashboard uses address_text
+};
 
 // A professional, clean map style that helps markers stand out.
 const mapStyle = [
-  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
-  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
-  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
-  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
-  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
-  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
-  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
-  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
+    { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+    { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+    { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+    { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+    { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+    { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+    { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+    { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+    { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+    { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+    { "featureType": "transit.line", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+    { "featureType": "transit.station", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
+    { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
 ];
 
 const TechnicianMapViewScreen = () => {
-    const { tasks } = useTechnicianTasks();
+    const { user } = useAuth();
     const navigation = useNavigation<RootStackNavigationProp<'TechnicianMain'>>();
-    const [selectedTask, setSelectedTask] = useState<TechnicianTask | null>(null);
+    const [tasks, setTasks] = useState<any[]>([]); // Use any[] if types are uncertain, or define properly
+    const [selectedTask, setSelectedTask] = useState<any | null>(null);
     const slideAnim = useRef(new Animated.Value(300)).current;
+
+    const fetchTasks = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('issues')
+                .select('*')
+                .eq('assigned_to', user.id)
+                .in('status', ['assigned', 'in_progress', 'pending', 'open']); // Only active tasks
+
+            if (error) throw error;
+            setTasks(data || []);
+        } catch (error) {
+            console.error('Error fetching map tasks:', error);
+        }
+    }, [user]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchTasks();
+        }, [fetchTasks])
+    );
+
+    useRealtime('issues', fetchTasks);
 
     useEffect(() => {
         Animated.timing(slideAnim, {
@@ -40,21 +84,24 @@ const TechnicianMapViewScreen = () => {
             duration: 350,
             useNativeDriver: true,
         }).start();
-    }, [selectedTask]);
+    }, [selectedTask, slideAnim]);
 
-    const initialRegion = tasks.length > 0 ? {
-        latitude: tasks[0].coords.latitude,
-        longitude: tasks[0].coords.longitude,
-        latitudeDelta: 0.2,
-        longitudeDelta: 0.2,
-    } : {
-        latitude: 23.0225, // Default to Ahmedabad
+    const initialRegion = {
+        latitude: 23.0225, // Ahmedabad default
         longitude: 72.5714,
-        latitudeDelta: 0.5,
-        longitudeDelta: 0.5,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
     };
-    
-    const handleMarkerPress = (task: TechnicianTask) => {
+
+    // If we have tasks with location, center on the first one
+    const mapRegion = tasks.length > 0 && tasks[0].latitude && tasks[0].longitude ? {
+        latitude: tasks[0].latitude,
+        longitude: tasks[0].longitude,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+    } : initialRegion;
+
+    const handleMarkerPress = (task: any) => {
         setSelectedTask(task);
     };
 
@@ -62,6 +109,10 @@ const TechnicianMapViewScreen = () => {
         if (priority === 'High') return { bgColor: 'rgba(239, 68, 68, 0.2)', iconColor: '#EF4444', icon: 'alert-triangle' as const };
         if (priority === 'Medium') return { bgColor: 'rgba(245, 158, 11, 0.2)', iconColor: '#F59E0B', icon: 'alert-circle' as const };
         return { bgColor: 'rgba(16, 185, 129, 0.2)', iconColor: '#10B981', icon: 'check-circle' as const };
+    };
+
+    const formatText = (text: string) => {
+        return text ? text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
     };
 
     return (
@@ -73,16 +124,19 @@ const TechnicianMapViewScreen = () => {
                 style={styles.map}
                 provider="google"
                 initialRegion={initialRegion}
+                region={selectedTask ? undefined : mapRegion} // Only auto-pan if no task selected (optional)
                 customMapStyle={mapStyle}
-                onPress={() => setSelectedTask(null)} // Deselect on map press
+                onPress={() => setSelectedTask(null)}
             >
                 {tasks.map(task => {
+                    if (!task.latitude || !task.longitude) return null;
+
                     const markerStyle = getMarkerStyle(task.priority);
                     const isSelected = selectedTask?.id === task.id;
                     return (
                         <Marker
                             key={task.id}
-                            coordinate={task.coords}
+                            coordinate={{ latitude: task.latitude, longitude: task.longitude }}
                             onPress={() => handleMarkerPress(task)}
                             anchor={{ x: 0.5, y: 0.5 }}
                         >
@@ -91,22 +145,35 @@ const TechnicianMapViewScreen = () => {
                     );
                 })}
             </MapView>
-            
+
             {selectedTask && (
                 <Animated.View style={[styles.bottomCard, { transform: [{ translateY: slideAnim }] }]}>
-                    <Image source={{ uri: selectedTask.imageUrl }} style={styles.cardImage} />
+                    {/* Fallback image if no image_url, or use issue type icon placeholder */}
+                    {selectedTask.image_url ? (
+                        <Image source={{ uri: selectedTask.image_url }} style={styles.cardImage} />
+                    ) : (
+                        <View style={[styles.cardImage, { backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Icon name="image" size={40} color="#9CA3AF" />
+                        </View>
+                    )}
+
                     <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedTask(null)}>
                         <Icon name="x" size={20} color="#374151" />
                     </TouchableOpacity>
                     <View style={styles.cardContent}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>{selectedTask.type}</Text>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{formatText(selectedTask.issue_type)}</Text>
                         <View style={styles.locationRow}>
                             <Icon name="map-pin" size={14} color="#6B7280" />
-                            <Text style={styles.cardLocation}>{selectedTask.location}</Text>
+                            <Text style={styles.cardLocation} numberOfLines={1}>
+                                {selectedTask.address_text || selectedTask.location || 'No address'}
+                            </Text>
                         </View>
-                        <TouchableOpacity 
-                            style={styles.detailsButton} 
-                            onPress={() => navigation.navigate('TechnicianIssueDetail', { taskId: selectedTask.id })}>
+                        <TouchableOpacity
+                            style={styles.detailsButton}
+                            onPress={() => {
+                                navigation.navigate('TechnicianIssueDetail', { taskId: selectedTask.id });
+                                setSelectedTask(null);
+                            }}>
                             <Text style={styles.detailsButtonText}>View Full Details</Text>
                             <Icon name="arrow-right-circle" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
@@ -117,7 +184,7 @@ const TechnicianMapViewScreen = () => {
     );
 };
 
-// Custom Marker Component with pulsing animation for high priority
+// Custom Marker Component (Unchanged)
 const CustomMarker = ({ isSelected, priority, icon, iconColor }: { isSelected: boolean, priority: string, icon: any, iconColor: string }) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -139,7 +206,7 @@ const CustomMarker = ({ isSelected, priority, icon, iconColor }: { isSelected: b
             pulse.start();
             return () => pulse.stop();
         }
-    }, [isSelected, priority]);
+    }, [isSelected, priority, scaleAnim, pulseAnim]);
 
     return (
         <Animated.View style={[styles.markerContainer, { transform: [{ scale: scaleAnim }] }]}>
@@ -202,7 +269,7 @@ const styles = StyleSheet.create({
     cardContent: { padding: 20, paddingTop: 15 },
     cardTitle: { fontSize: 20, fontWeight: 'bold', color: '#1F2937', marginBottom: 8 },
     locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-    cardLocation: { fontSize: 16, color: '#6B7280', marginLeft: 8 },
+    cardLocation: { fontSize: 16, color: '#6B7280', marginLeft: 8, flex: 1 },
     detailsButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -221,7 +288,8 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        zIndex: 10
     }
 });
 

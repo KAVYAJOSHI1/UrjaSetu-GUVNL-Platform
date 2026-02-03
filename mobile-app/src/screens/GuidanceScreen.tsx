@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
-    Alert,
-    LayoutAnimation,
-    Linking,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View,
+  Alert,
+  LayoutAnimation,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -24,7 +24,7 @@ if (Platform.OS === 'android') {
 }
 
 const GuidanceScreen = () => {
-  const { t } = useLanguage();
+  const { } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {

@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { Platform } from 'react-native';
+
 
 // For Android Emulator: 10.0.2.2
 // For Physical Device: Your LAN IP (192.168.16.108 from your supabase.ts)

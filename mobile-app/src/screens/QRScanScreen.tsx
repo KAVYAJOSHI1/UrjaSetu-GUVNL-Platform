@@ -1,5 +1,5 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -14,9 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useLanguage } from '../contexts/LanguageContext';
-import { RootStackParamList } from '../navigation/types';
+import { RootStackParamList, RootStackNavigationProp } from '../navigation/types';
 
-import { RootStackNavigationProp } from '../navigation/types';
+
 
 const QRScanScreen = () => {
   const { t } = useLanguage();

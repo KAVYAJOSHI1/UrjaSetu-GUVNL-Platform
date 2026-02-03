@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,13 +42,11 @@ const SuggestionsScreen = () => {
   // Checks if the form is valid (disables submit button)
   const isFormValid = newTitle.trim() !== '' && newDescription.trim() !== '';
 
-  useEffect(() => {
-    fetchSuggestions();
-  }, []);
 
-  const fetchSuggestions = async () => {
+
+  const fetchSuggestions = useCallback(async () => {
     setLoading(true);
-    
+
     // --- 2. FETCH FIX ---
     // Now selects 'name' from profiles
     const { data, error } = await supabase
@@ -68,7 +66,11 @@ const SuggestionsScreen = () => {
       setSuggestions(data as Suggestion[]);
     }
     setLoading(false);
-  };
+  }, [t]);
+
+  useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
 
   const handleUpvote = async (id: string, currentUpvotes: number) => {
     const newUpvotes = currentUpvotes + 1;
@@ -95,23 +97,23 @@ const SuggestionsScreen = () => {
     if (!isFormValid) return; // Guard clause
 
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError || !session?.user) {
-        console.error('Error getting user session:', sessionError);
-        Alert.alert(t('error_title'), t('suggestions_user_error'));
-        return;
+      console.error('Error getting user session:', sessionError);
+      Alert.alert(t('error_title'), t('suggestions_user_error'));
+      return;
     }
 
     const user = session.user;
-    
+
     // --- 3. SUBMIT FIX ---
     // Now saves to the new 'title' and 'description' columns
     const newSuggestionData = {
       citizen_id: user.id,
       title: newTitle.trim(),
       description: newDescription.trim(),
-      upvotes: 1, 
-      
+      upvotes: 1,
+
     };
 
     // --- 4. RE-FETCH FIX ---
@@ -154,9 +156,9 @@ const SuggestionsScreen = () => {
             <Icon name="thumbs-up" size={18} color="#0056b3" />
             <Text style={styles.footerText}>{item.upvotes}</Text>
           </TouchableOpacity>
-          
-          
-          
+
+
+
         </View>
       </View>
     );
@@ -190,37 +192,37 @@ const SuggestionsScreen = () => {
 
       <Modal visible={modalVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>{t('suggestions_modal_title')}</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder={t('suggestions_title_placeholder')}
-                    placeholderTextColor="#9CA3AF"
-                    value={newTitle}
-                    onChangeText={setNewTitle}
-                />
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder={t('suggestions_desc_placeholder')}
-                    placeholderTextColor="#9CA3AF"
-                    value={newDescription}
-                    onChangeText={setNewDescription}
-                    multiline
-                />
-                
-                {/* 7. DISABLED BUTTON FIX */}
-                <TouchableOpacity 
-                  style={[styles.submitButton, !isFormValid && styles.submitButtonDisabled]} 
-                  onPress={handleSubmit}
-                  disabled={!isFormValid} // This disables the button
-                >
-                    <Text style={styles.submitButtonText}>{t('suggestions_submit_btn')}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.closeButtonText}>{t('cancel_btn')}</Text>
-                </TouchableOpacity>
-            </View>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{t('suggestions_modal_title')}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t('suggestions_title_placeholder')}
+              placeholderTextColor="#9CA3AF"
+              value={newTitle}
+              onChangeText={setNewTitle}
+            />
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder={t('suggestions_desc_placeholder')}
+              placeholderTextColor="#9CA3AF"
+              value={newDescription}
+              onChangeText={setNewDescription}
+              multiline
+            />
+
+            {/* 7. DISABLED BUTTON FIX */}
+            <TouchableOpacity
+              style={[styles.submitButton, !isFormValid && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!isFormValid} // This disables the button
+            >
+              <Text style={styles.submitButtonText}>{t('suggestions_submit_btn')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              <Text style={styles.closeButtonText}>{t('cancel_btn')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -290,7 +292,7 @@ const styles = StyleSheet.create({
   textArea: { height: 120, textAlignVertical: 'top' },
   submitButton: { backgroundColor: '#0056b3', padding: 16, borderRadius: 10, alignItems: 'center' },
   submitButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  
+
   submitButtonDisabled: {
     backgroundColor: '#A5B4FC', // A lighter, "disabled" color
   },

@@ -101,8 +101,42 @@ async function seedIssues() {
     }
 }
 
+async function gamifyLinemen() {
+    console.log('--- Gamifying Linemen ---');
+    try {
+        // 1. Fetch all linemen
+        const res = await fetch(`${BASE_URL}/rest/v1/users?role=eq.lineman`);
+        const linemen = await res.json();
+
+        const BADGES = ['⚡ Fast Fixer', '🌟 Top Rated', '🛡️ Safety First', '🦸 Super Hero'];
+
+        for (const user of linemen) {
+            const points = Math.floor(Math.random() * 5000) + 100;
+            const level = Math.floor(points / 1000) + 1;
+            const userBadges = [];
+            if (points > 1000) userBadges.push(BADGES[0]);
+            if (points > 2000) userBadges.push(BADGES[1]);
+            if (Math.random() > 0.5) userBadges.push(BADGES[2]);
+
+            await fetch(`${BASE_URL}/rest/v1/users?id=eq.${user.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    points,
+                    level,
+                    badges: JSON.stringify(userBadges)
+                })
+            });
+            console.log(`Updated ${user.name}: Pts ${points}, Lwl ${level}`);
+        }
+    } catch (e) {
+        console.error('Gamification Error:', e);
+    }
+}
+
 async function run() {
     await seedLinemen();
+    await gamifyLinemen(); // Add this
     await seedIssues();
     console.log('--- Seeding Complete ---');
 }

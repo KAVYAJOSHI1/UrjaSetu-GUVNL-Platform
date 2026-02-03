@@ -42,7 +42,9 @@ export default function Linemen() {
                 .select("assigned_to, status")
                 .in("status", ["open", "in_progress", "assigned"]);
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const linemenWithLoad = (profiles as any[])?.map((p: any) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const count = (activeIssues as any[])?.filter((i: any) => i.assigned_to === p.id).length || 0;
                 return { ...p, active_tasks: count };
             });

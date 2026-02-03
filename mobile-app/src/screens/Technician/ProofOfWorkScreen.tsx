@@ -121,7 +121,7 @@ const ProofOfWorkScreen = () => {
         <SafeAreaView style={styles.container}>
             <Text style={styles.title}>Submit Proof of Work</Text>
             <View style={styles.card}>
-                <Text style={styles.label}>1. "After" Photo (Mandatory)</Text>
+                <Text style={styles.label}>1. &quot;After&quot; Photo (Mandatory)</Text>
                 <TouchableOpacity style={styles.imagePicker} onPress={handleImagePick}>
                     {imageUri ? (
                         <Image source={{ uri: imageUri }} style={styles.imagePreview} />

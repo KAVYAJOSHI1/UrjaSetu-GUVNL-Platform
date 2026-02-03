@@ -38,6 +38,7 @@ export default function Issues() {
         const { data } = await supabase.from("profiles").select("id, name");
         if (data) {
             const map: Record<string, string> = {};
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (data as any[]).forEach((p: any) => { map[p.id] = p.name; });
             setLinemenMap(map);
         }
@@ -53,6 +54,7 @@ export default function Issues() {
         if (error) {
             toast.error("Failed to fetch issues");
         } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setIssues((data as any) || []);
         }
         setLoading(false);
@@ -170,8 +172,8 @@ export default function Issues() {
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={`capitalize border ${issue.priority === 'High' ? 'text-red-600 border-red-200 bg-red-50' :
-                                                issue.priority === 'Medium' ? 'text-orange-600 border-orange-200 bg-orange-50' :
-                                                    'text-emerald-600 border-emerald-200 bg-emerald-50'
+                                            issue.priority === 'Medium' ? 'text-orange-600 border-orange-200 bg-orange-50' :
+                                                'text-emerald-600 border-emerald-200 bg-emerald-50'
                                             }`}>
                                             {issue.priority}
                                         </Badge>

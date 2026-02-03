@@ -195,11 +195,14 @@ const ReportScreen = () => {
         if (uploadError) throw new Error(uploadError.message);
 
         // Get the public URL
-        const { data: urlData } = supabase.storage
-          .from('issue-images')
+        if (!uploadData) throw new Error('Image upload failed');
+
+        const { data: publicData } = supabase
+          .storage
+          .from('issues')
           .getPublicUrl(uploadData.path);
 
-        publicImageUrl = urlData.publicUrl;
+        publicImageUrl = publicData.publicUrl;
       }
 
       // 3. Prepare location data for PostGIS (Stored as JSON for local compatibility)

@@ -1,4 +1,5 @@
 const express = require('express');
+const { exec } = require('child_process');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -22,6 +23,15 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- Mock Notification Service ---
+function sendMockSMS(to, message) {
+    if (!to) return;
+    const timestamp = new Date().toLocaleTimeString();
+    const sms = `\n📱 [SMS SENT | ${timestamp}] To: ${to}\n   Message: "${message}"\n`;
+    console.log(sms);
+    // In production, calling Twilio/Gupshup API would happen here.
+}
+
 // Initialize Database
 const db = new sqlite3.Database('./urjasetu.db', (err) => {
     if (err) {
@@ -43,8 +53,25 @@ function initDb() {
             role TEXT,
             phone TEXT,
             zone TEXT,
-            status TEXT DEFAULT 'active'
+            status TEXT DEFAULT 'active',
+            points INTEGER DEFAULT 0,
+            level INTEGER DEFAULT 1,
+            badges TEXT DEFAULT '[]'
         )`);
+
+        // Migration for existing tables
+        // Migration for existing tables - Handle duplicate column errors gracefully
+        const safeAddColumn = (sql) => {
+            db.run(sql, (err) => {
+                if (err && !err.message.includes("duplicate column")) {
+                    console.error("Migration warning:", err.message);
+                }
+            });
+        };
+
+        safeAddColumn("ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0");
+        safeAddColumn("ALTER TABLE users ADD COLUMN level INTEGER DEFAULT 1");
+        safeAddColumn("ALTER TABLE users ADD COLUMN badges TEXT DEFAULT '[]'");
 
         // Issues Table
         db.run(`CREATE TABLE IF NOT EXISTS issues (
@@ -134,11 +161,11 @@ app.post('/auth/v1/token', (req, res) => {
 
 app.post('/auth/v1/signup', (req, res) => {
     const { email, password, data } = req.body;
-    const { name, phone, role } = data || {};
+    const { name, phone, role, points, level, badges } = data || {};
     const id = Math.random().toString(36).substr(2, 9);
 
-    db.run("INSERT INTO users (id, email, password, name, role, phone) VALUES (?, ?, ?, ?, ?, ?)",
-        [id, email, password, name, role || 'citizen', phone],
+    db.run("INSERT INTO users (id, email, password, name, role, phone, points, level, badges) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [id, email, password, name, role || 'citizen', phone, points || 0, level || 1, JSON.stringify(badges || [])],
         function (err) {
             if (err) return res.status(400).json({ error: err.message });
 
@@ -259,6 +286,13 @@ app.post('/rest/v1/:table', (req, res) => {
     // Auto-generate ID if not present
     if (!data.id) data.id = Math.random().toString(36).substr(2, 9);
 
+    // --- Notification Trigger: New Issue ---
+    if (dbTable === 'issues') {
+        const citizenPhone = '9876543210'; // Mock Citizen Phone
+        sendMockSMS(citizenPhone, `UrjaSetu: Complaint Received! Ref ID: ${data.id}. We will assign a technician shortly.`);
+        sendMockSMS('9998887776', `Admin Alert: New ${data.priority || 'Normal'} Priority Issue reported at ${data.address_text || 'Unknown Location'}`);
+    }
+
     const keys = Object.keys(data);
     const values = Object.values(data);
     const placeholders = keys.map(() => '?').join(',');
@@ -295,6 +329,16 @@ app.patch('/rest/v1/:table', (req, res) => {
 
     db.run(query, params, function (err) {
         if (err) return res.status(400).json({ error: err.message });
+
+        // --- Notification Trigger: Issue Update ---
+        if (dbTable === 'issues') {
+            if (updates.includes('status = ?') && data.status === 'resolved') {
+                // Mock fetching citizen_id to get phone, for now static
+                sendMockSMS('9876543210', `UrjaSetu: Great news! Your complaint has been RESOLVED. Thank you for using UrjaSetu.`);
+            } else if (updates.includes('assigned_to = ?') && data.assigned_to) {
+                sendMockSMS('Lineman', `UrjaSetu: New Task Assigned! Priority: ${data.priority || 'Check App'}.`);
+            }
+        }
 
         // Emit Real-time Event
         io.emit('db-change', {
@@ -368,36 +412,60 @@ app.post('/storage/v1/object/:bucket/:filename', upload.single('file'), (req, re
 });
 
 // --- AI Mock Function ---
+// --- AI Mock Function ---
 app.post('/functions/v1/analyze-image', upload.single('file'), (req, res) => {
     console.log('[AI] Received request /functions/v1/analyze-image');
-    if (req.file) console.log('[AI] File received:', req.file.path, req.file.size);
-    else console.log('[AI] No file received!');
-    // In a real scenario, we would pass req.file.path to a Python script
-    // E.g., const { exec } = require('child_process');
-    // exec(`python3 predict.py ${req.file.path}`, ...)
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-    // Simulate AI Latency
-    setTimeout(() => {
-        const classes = [
-            { label: 'Transformer Sparking', priority: 'High', desc: 'Sparks detected near transformer unit. Critical fire hazard.' },
-            { label: 'Short Circuit', priority: 'High', desc: 'Visible arc flash or burn marks consistent with short circuit.' },
-            { label: 'Pole Fallen', priority: 'High', desc: 'Utility pole detected in non-vertical position. Immediate obstruction.' },
-            { label: 'Broken Meter Box', priority: 'Medium', desc: 'Energy meter enclosure appears damaged or tampered.' }
-        ];
+    const imagePath = req.file.path;
+    // Use the venv python
+    // Helper to get absolute path relative to project root
+    const projectRoot = path.join(__dirname, '..');
+    const pythonPath = path.join(projectRoot, 'venv/bin/python');
+    const scriptPath = path.join(projectRoot, 'scripts/predict_issue.py');
 
-        // Random prediction for demo
-        const prediction = classes[Math.floor(Math.random() * classes.length)];
-        const confidence = (Math.random() * (99 - 85) + 85).toFixed(1);
+    const command = `"${pythonPath}" "${scriptPath}" "${imagePath}"`;
 
-        console.log(`[AI] Analyzed image. Prediction: ${prediction.label} (${confidence}%)`);
+    console.log(`[AI] Executing: ${command}`);
 
-        res.json({
-            prediction: prediction.label,
-            confidence: confidence,
-            priority: prediction.priority,
-            description: prediction.desc
-        });
-    }, 1500);
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`[AI] Error: ${error.message}`);
+            // Even if error, check if we have stdout (sometimes warnings cause error code?)
+            // But usually error code 1 means fail.
+            // return res.status(500).json({ error: 'AI Analysis Failed' });
+        }
+        if (stderr) {
+            // Ultralytics prints to stderr sometimes even on success, or warnings
+            console.error(`[AI] Stderr: ${stderr}`);
+        }
+
+        try {
+            // Find the last line that looks like JSON
+            const lines = stdout.trim().split('\n');
+            const jsonLine = lines[lines.length - 1];
+            const result = JSON.parse(jsonLine);
+            console.log('[AI] Prediction:', result);
+            res.json(result);
+        } catch (e) {
+            console.error('[AI] Result Parsing Error. Stdout:', stdout);
+            res.status(500).json({ error: 'AI Response Invalid' });
+        }
+    });
+});
+
+// --- AI Predictive Maintenance API ---
+app.get('/api/predictions', (req, res) => {
+    // Mock Data: High risk zones in Ahmedabad
+    const predictions = [
+        { lat: 23.0225, lng: 72.5714, risk: 'High', reason: 'Frequent Transformer Overloads', radius: 500 },
+        { lat: 23.0335, lng: 72.5824, risk: 'Medium', reason: 'Aging Infrastructure', radius: 700 },
+        { lat: 23.0115, lng: 72.5634, risk: 'Low', reason: 'Recent Maintenance Completed', radius: 400 },
+        { lat: 23.0455, lng: 72.5934, risk: 'High', reason: 'Vegetation Interference', radius: 600 }
+    ];
+    res.json(predictions);
 });
 
 // --- Start Server ---

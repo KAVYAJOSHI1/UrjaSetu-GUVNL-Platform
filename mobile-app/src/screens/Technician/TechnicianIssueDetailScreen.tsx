@@ -1,5 +1,5 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -55,7 +55,7 @@ const TechnicianIssueDetailScreen = () => {
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -76,12 +76,12 @@ const TechnicianIssueDetailScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
 
   useEffect(() => {
     fetchTask();
     // Add focus listener via navigation if needed, but simple re-mount works too
-  }, [taskId]);
+  }, [fetchTask, taskId]);
 
   const updateStatus = async (newStatus: string) => {
     if (!task || isUpdating) return;
@@ -169,6 +169,11 @@ const TechnicianIssueDetailScreen = () => {
 
   const priorityStyle = getPriorityStyle(task.priority);
 
+  /* Helper to format text (remove underscores, capitalize) */
+  const formatText = (text: string) => {
+    return text ? text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -182,7 +187,8 @@ const TechnicianIssueDetailScreen = () => {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{task.issue_type}</Text>
+          {/* Apply formatting to issue_type */}
+          <Text style={styles.title}>{formatText(task.issue_type)}</Text>
           <View style={[styles.statusBadge,
           task.status === 'pending' ? { backgroundColor: '#FEF3C7' } :
             task.status === 'resolved' ? { backgroundColor: '#D1FAE5' } : {}
@@ -190,7 +196,7 @@ const TechnicianIssueDetailScreen = () => {
             <Text style={[styles.statusBadgeText,
             task.status === 'pending' ? { color: '#B45309' } :
               task.status === 'resolved' ? { color: '#065F46' } : {}
-            ]}>{task.status.toUpperCase().replace('_', ' ')}</Text>
+            ]}>{formatText(task.status)}</Text>
           </View>
         </View>
 

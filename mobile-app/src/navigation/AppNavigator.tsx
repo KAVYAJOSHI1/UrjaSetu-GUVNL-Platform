@@ -26,6 +26,7 @@ import TechnicianDashboardScreen from '../screens/Technician/TechnicianDashboard
 import TechnicianIssueDetailScreen from '../screens/Technician/TechnicianIssueDetailScreen';
 import TechnicianMapViewScreen from '../screens/Technician/TechnicianMapViewScreen';
 import TechnicianProfileScreen from '../screens/Technician/TechnicianProfileScreen';
+import LeaderboardScreen from '../screens/Technician/LeaderboardScreen';
 
 import { MainTabParamList, RootStackParamList, TechnicianTabParamList } from './types';
 
@@ -36,12 +37,7 @@ const RootStack = createStackNavigator<RootStackParamList>();
 
 // --- Auth Stack ---
 // Groups the Login and Register screens together
-const AuthNavigator = () => (
-  <RootStack.Navigator screenOptions={{ headerShown: false, cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS }}>
-    <RootStack.Screen name="Login" component={LoginScreen} />
-    <RootStack.Screen name="Register" component={RegisterScreen} />
-  </RootStack.Navigator>
-);
+
 
 // --- Citizen's Tab Navigator ---
 function CitizenTabNavigator() {
@@ -125,6 +121,7 @@ export default function AppNavigator() {
                       <RootStack.Screen name="TechnicianMain" component={TechnicianTabNavigator} />
                       <RootStack.Screen name="TechnicianIssueDetail" component={TechnicianIssueDetailScreen} />
                       <RootStack.Screen name="ProofOfWork" component={ProofOfWorkScreen} />
+                      <RootStack.Screen name="Leaderboard" component={LeaderboardScreen} />
                     </>
                   );
                 // case 'admin':

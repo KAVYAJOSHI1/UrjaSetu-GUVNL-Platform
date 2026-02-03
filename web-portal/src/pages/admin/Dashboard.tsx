@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom"; // Add import
 import { AlertCircle, CheckCircle, Clock, RefreshCcw, Activity, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import 'leaflet/dist/leaflet.css';
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-let DefaultIcon = L.icon({
+const DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
     iconSize: [25, 41],
@@ -34,7 +34,7 @@ function HeatmapLayer({ points }: { points: [number, number, number][] }) {
     useEffect(() => {
         if (!points.length) return;
 
-        // @ts-ignore - leaflet.heat adds heatLayer to L
+
         const heat = L.heatLayer(points, {
             radius: 25,
             blur: 15,
@@ -76,11 +76,21 @@ interface IssueLocation {
     address: string;
 }
 
+interface PredictionZone {
+    lat: number;
+    lng: number;
+    risk: 'High' | 'Medium' | 'Low';
+    reason: string;
+    radius: number;
+}
+
 export default function Dashboard() {
     const [issues, setIssues] = useState<Issue[]>([]);
+    const [predictions, setPredictions] = useState<PredictionZone[]>([]);
     const [loading, setLoading] = useState(true);
     const [showHeatmap, setShowHeatmap] = useState(false);
-    const navigate = useNavigate(); // Add hook
+    const [showPredictions, setShowPredictions] = useState(false);
+    const navigate = useNavigate();
 
     const fetchData = async () => {
         setLoading(true);
@@ -92,8 +102,20 @@ export default function Dashboard() {
         if (error) {
             toast.error("Failed to update dashboard");
         } else {
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setIssues((data as any[]) || []);
         }
+
+        // Fetch Predictions
+        try {
+            const predRes = await fetch('http://localhost:3000/api/predictions');
+            const predData = await predRes.json();
+            setPredictions(predData);
+        } catch (e) {
+            console.error("Failed to fetch predictions");
+        }
+
         setLoading(false);
     };
 
@@ -103,6 +125,7 @@ export default function Dashboard() {
 
     // Real-time updates
     useRealtime('issues', () => {
+        // Refresh data on change
         fetchData();
     });
 
@@ -368,7 +391,17 @@ export default function Dashboard() {
                                     onCheckedChange={setShowHeatmap}
                                     className="data-[state=checked]:bg-primary"
                                 />
-                                <Label htmlFor="heatmap-mode" className="text-sm font-medium cursor-pointer">Heatmap View</Label>
+                                <Label htmlFor="heatmap-mode" className="text-sm font-medium cursor-pointer">Heatmap</Label>
+                            </div>
+
+                            <div className="flex items-center space-x-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">
+                                <Switch
+                                    id="pred-mode"
+                                    checked={showPredictions}
+                                    onCheckedChange={setShowPredictions}
+                                    className="data-[state=checked]:bg-purple-600"
+                                />
+                                <Label htmlFor="pred-mode" className="text-sm font-medium cursor-pointer text-purple-700">AI Predictions</Label>
                             </div>
 
                             {!showHeatmap && (
@@ -400,6 +433,31 @@ export default function Dashboard() {
                                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                             />
                             <ChangeView bounds={mapBounds} />
+
+                            {showPredictions && predictions.map((pred, i) => (
+                                <Circle
+                                    key={i}
+                                    center={[pred.lat, pred.lng]}
+                                    radius={pred.radius}
+                                    pathOptions={{
+                                        color: pred.risk === 'High' ? '#ef4444' : pred.risk === 'Medium' ? '#f97316' : '#10b981',
+                                        fillColor: pred.risk === 'High' ? '#ef4444' : pred.risk === 'Medium' ? '#f97316' : '#10b981',
+                                        fillOpacity: 0.2
+                                    }}
+                                >
+                                    <Popup>
+                                        <div className="p-2">
+                                            <h4 className="font-bold flex items-center gap-2">
+                                                <span className="text-lg">🔮</span> AI Prediction
+                                            </h4>
+                                            <div className="badge mt-1 mb-2 inline-block px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800">
+                                                {pred.risk} Risk Zone
+                                            </div>
+                                            <p className="text-sm text-gray-600">{pred.reason}</p>
+                                        </div>
+                                    </Popup>
+                                </Circle>
+                            ))}
 
                             {showHeatmap ? (
                                 <HeatmapLayer points={heatmapPoints} />
@@ -439,8 +497,8 @@ export default function Dashboard() {
                                                 <div className="p-1 min-w-[220px]">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${isResolved ? 'bg-emerald-100 text-emerald-700' :
-                                                                isCritical ? 'bg-red-100 text-red-700' :
-                                                                    'bg-blue-100 text-blue-700'
+                                                            isCritical ? 'bg-red-100 text-red-700' :
+                                                                'bg-blue-100 text-blue-700'
                                                             }`}>
                                                             {loc.status.replace('_', ' ')}
                                                         </span>

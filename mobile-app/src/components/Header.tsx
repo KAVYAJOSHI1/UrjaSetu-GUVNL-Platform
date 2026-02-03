@@ -7,7 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import ProfileModal from '../screens/ProfileModal';
 
 const Header = () => {
-  const { language, toggleLanguage } = useLanguage();
+  const { language, cycleLanguage } = useLanguage();
   const [isProfileOpen, setProfileOpen] = useState(false);
   // 2. Get the measurements for the top, bottom, etc.
   const insets = useSafeAreaInsets();
@@ -18,7 +18,7 @@ const Header = () => {
       <View style={[styles.container, { paddingTop: insets.top + 15 }]}>
         <Text style={styles.logo}>Urja Setu</Text>
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.langButton} onPress={toggleLanguage}>
+          <TouchableOpacity style={styles.langButton} onPress={cycleLanguage}>
             <Text style={styles.langText}>{language.toUpperCase()}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton} onPress={() => setProfileOpen(true)}>

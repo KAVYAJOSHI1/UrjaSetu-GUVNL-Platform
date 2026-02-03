@@ -126,6 +126,7 @@ export const ReportsProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useReports = () => {
   const context = useContext(ReportsContext);
   if (!context) {

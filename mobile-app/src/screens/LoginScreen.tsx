@@ -4,7 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
+
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -20,10 +20,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { RootStackNavigationProp } from '../navigation/types';
 
-const { width } = Dimensions.get('window');
+
 
 const LoginScreen = () => {
-  const { t } = useLanguage(); // Although we'll hardcode some English for the design revamp
+  const { t } = useLanguage();
   const { login } = useAuth();
   const navigation = useNavigation<RootStackNavigationProp<'Login'>>();
 
@@ -76,7 +76,7 @@ const LoginScreen = () => {
 
         {/* Login Form Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Citizen Login</Text>
+          <Text style={styles.cardTitle}>{t('auth.login_title') || 'Login'}</Text>
           <Text style={styles.cardSubtitle}>Welcome back! Please login to continue.</Text>
 
           {/* Email Input */}
@@ -84,7 +84,7 @@ const LoginScreen = () => {
             <Icon name="mail" size={20} color="#64748B" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Email Address"
+              placeholder={t('auth.email') || 'Email'}
               placeholderTextColor="#94A3B8"
               value={email}
               onChangeText={setEmail}
@@ -98,7 +98,7 @@ const LoginScreen = () => {
             <Icon name="lock" size={20} color="#64748B" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t('auth.password') || 'Password'}
               placeholderTextColor="#94A3B8"
               value={password}
               onChangeText={setPassword}
@@ -125,7 +125,7 @@ const LoginScreen = () => {
               <ActivityIndicator color="#fff" />
             ) : (
               <View style={styles.loginButtonContent}>
-                <Text style={styles.loginButtonText}>LOGIN</Text>
+                <Text style={styles.loginButtonText}>{t('auth.login_button') || 'LOGIN'}</Text>
                 <Icon name="arrow-right" size={20} color="#fff" />
               </View>
             )}
@@ -133,7 +133,7 @@ const LoginScreen = () => {
 
           {/* Register Link */}
           <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
+            <Text style={styles.registerText}>Don&apos;t have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
               <Text style={styles.registerLink}>Register Now</Text>
             </TouchableOpacity>

@@ -166,20 +166,7 @@ class QueryBuilder {
   }
 }
 
-// Hardcoded Session for Bypass
-const MOCK_SESSION = {
-  access_token: "mock-token",
-  token_type: "bearer",
-  user: {
-    id: "citizen-user-id",
-    email: "citizen@urjasetu.com",
-    role: "citizen",
-    user_metadata: {
-      name: "Test Citizen",
-      phone: "9876543210"
-    }
-  }
-};
+
 
 export const supabase = {
   // Auth Namespace
@@ -229,7 +216,7 @@ export const supabase = {
           const session = JSON.parse(stored);
           return { data: { session }, error: null };
         }
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
       return { data: { session: null }, error: null };

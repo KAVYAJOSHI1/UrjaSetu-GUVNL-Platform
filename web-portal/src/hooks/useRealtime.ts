@@ -12,6 +12,7 @@ export const useRealtime = (table: string, onUpdate: () => void) => {
             console.log('Web Socket connected');
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         socket.on('db-change', (payload: any) => {
             if (payload.table === table) {
                 console.log('Web Realtime Update:', payload);

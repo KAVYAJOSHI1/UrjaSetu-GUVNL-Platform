@@ -60,7 +60,9 @@ export function AssignLinemanDialog({ issueId, open, onOpenChange, onAssigned }:
             .in("status", ["open", "in_progress", "assigned"]);
 
         if (profiles) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const linemenWithLoad = (profiles as any[]).map((p: any) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const count = (activeIssues as any[])?.filter((i: any) => i.assigned_to === p.id).length || 0;
                 return { ...p, active_tasks: count };
             });

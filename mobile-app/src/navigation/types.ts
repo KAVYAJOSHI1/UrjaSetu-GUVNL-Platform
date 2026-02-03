@@ -44,6 +44,7 @@ export type RootStackParamList = {
   TechnicianMain: NavigatorScreenParams<TechnicianTabParamList>;
   TechnicianIssueDetail: { taskId: string };
   ProofOfWork: { taskId: string };
+  Leaderboard: undefined;
 };
 
 

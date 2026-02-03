@@ -7,11 +7,15 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  RefreshControl,
+  StatusBar
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+
 import { RootStackNavigationProp } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
 import { useRealtime } from '../../hooks/useRealtime';
@@ -30,17 +34,32 @@ export type TechnicianTask = {
 const TechnicianDashboardScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp<'TechnicianMain'>>();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   // Tab State: 'active' or 'history'
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [tasks, setTasks] = useState<TechnicianTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({ points: 0, level: 1 });
 
-  const fetchTasks = useCallback(async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
     try {
+      // 1. Fetch Stats
+      const { data: userData } = await supabase
+        .from('users')
+        .select('points, level')
+        .eq('id', user.id)
+        .single();
+
+      if (userData) {
+        setStats({ points: userData.points || 0, level: userData.level || 1 });
+      }
+
+      // 2. Fetch Tasks
       let query = supabase
         .from('issues')
         .select('*')
@@ -48,42 +67,65 @@ const TechnicianDashboardScreen = () => {
         .order('created_at', { ascending: false });
 
       if (activeTab === 'active') {
-        // Active = assigned, in_progress, pending
-        // using neon/postgres syntax if available, otherwise client side filter or multiple queries
-        // Supabase .in() is cleaner
         query = query.in('status', ['assigned', 'in_progress', 'pending', 'open']);
       } else {
-        // History = resolved
         query = query.eq('status', 'resolved');
       }
 
-      const { data, error } = await query;
+      const { data: taskData, error: taskError } = await query;
 
-      if (error) throw error;
-      setTasks((data as any[]) || []);
+      if (taskError) throw taskError;
+      setTasks((taskData as any[]) || []);
+
     } catch (error: any) {
-      console.error('Error fetching tasks:', error.message);
+      console.error('Error fetching dashboard data:', error.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [user, activeTab]);
 
-  // Use focus effect to refresh when coming back from details
   useFocusEffect(
     useCallback(() => {
-      fetchTasks();
-    }, [fetchTasks])
+      fetchDashboardData();
+    }, [fetchDashboardData])
   );
 
-  // Real-time updates
   useRealtime('issues', () => {
-    fetchTasks();
+    fetchDashboardData();
   });
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
+  };
+
   const getPriorityStyle = (priority: TechnicianTask['priority']) => {
-    if (priority === 'High') return { bar: styles.priorityBarHigh, text: styles.priorityTextHigh, icon: 'alert-triangle', iconColor: '#EF4444' };
-    if (priority === 'Medium') return { bar: styles.priorityBarMedium, text: styles.priorityTextMedium, icon: 'alert-circle', iconColor: '#F59E0B' };
-    return { bar: styles.priorityBarLow, text: styles.priorityTextLow, icon: 'info', iconColor: '#6B7280' };
+    if (priority === 'High') return {
+      gradient: ['#FEE2E2', '#FEF2F2'] as const,
+      text: '#B91C1C',
+      icon: 'alert-triangle',
+      iconColor: '#EF4444',
+      border: '#FECACA'
+    };
+    if (priority === 'Medium') return {
+      gradient: ['#FFFBEB', '#FFF7ED'] as const,
+      text: '#B45309',
+      icon: 'alert-circle',
+      iconColor: '#F59E0B',
+      border: '#FDE68A'
+    };
+    return {
+      gradient: ['#F3F4F6', '#F9FAFB'] as const,
+      text: '#374151',
+      icon: 'info',
+      iconColor: '#6B7280',
+      border: '#E5E7EB'
+    };
+  };
+
+  const formatText = (text: string) => {
+    return text.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   const renderItem = ({ item }: { item: TechnicianTask }) => {
@@ -91,30 +133,51 @@ const TechnicianDashboardScreen = () => {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        activeOpacity={0.9}
         onPress={() => navigation.navigate('TechnicianIssueDetail', { taskId: item.id })}>
-        <View style={[styles.priorityBar, priorityStyle.bar]} />
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.issue_type}</Text>
-          <View style={styles.locationContainer}>
-            <Icon name="map-pin" size={14} color="#6B7280" />
-            <Text style={styles.cardLocation} numberOfLines={1}>{item.address_text}</Text>
+        <View style={styles.cardContainer}>
+          <View style={styles.cardHeader}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.cardTitle}>{formatText(item.issue_type)}</Text>
+              <Text style={styles.timeText}>{new Date(item.created_at).toLocaleDateString()}</Text>
+            </View>
+            <View style={[styles.priorityBadge, { backgroundColor: priorityStyle.gradient[0], borderColor: priorityStyle.border }]}>
+              <Icon name={priorityStyle.icon} size={12} color={priorityStyle.iconColor} style={{ marginRight: 4 }} />
+              <Text style={[styles.priorityText, { color: priorityStyle.text }]}>{item.priority}</Text>
+            </View>
           </View>
-          <View style={[styles.statusBadge,
-          item.status === 'pending' ? { backgroundColor: '#FEF3C7' } :
-            item.status === 'resolved' ? { backgroundColor: '#D1FAE5' } : {}
-          ]}>
-            <Text style={[styles.statusBadgeText,
-            item.status === 'pending' ? { color: '#B45309' } :
-              item.status === 'resolved' ? { color: '#065F46' } : {}
-            ]}>
-              {item.status.toUpperCase().replace('_', ' ')}
-            </Text>
+
+          <View style={styles.divider} />
+
+          <View style={styles.cardBody}>
+            <View style={styles.locationRow}>
+              <View style={styles.iconContainer}>
+                <Icon name="map-pin" size={14} color="#6B7280" />
+              </View>
+              <Text style={styles.cardLocation} numberOfLines={2}>
+                {item.address_text || t('tech_dashboard.no_location')}
+              </Text>
+            </View>
+
+            <View style={styles.statusRow}>
+              <View style={[styles.statusBadge,
+              item.status === 'pending' ? { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' } :
+                item.status === 'resolved' ? { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' } :
+                  item.status === 'in_progress' ? { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' } :
+                    { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' }
+              ]}>
+                <Text style={[styles.statusBadgeText,
+                item.status === 'pending' ? { color: '#B45309' } :
+                  item.status === 'resolved' ? { color: '#065F46' } :
+                    item.status === 'in_progress' ? { color: '#1E40AF' } :
+                      { color: '#374151' }
+                ]}>
+                  {formatText(item.status)}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={20} color="#D1D5DB" />
+            </View>
           </View>
-        </View>
-        <View style={styles.priorityContainer}>
-          <Icon name={priorityStyle.icon} size={20} color={priorityStyle.iconColor} />
-          <Text style={[styles.priorityText, priorityStyle.text]}>{item.priority}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -122,28 +185,65 @@ const TechnicianDashboardScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       <TechnicianHeader userName={user?.name || 'Technician'} />
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'active' && styles.activeTab]}
-          onPress={() => setActiveTab('active')}
+      {/* Stats Section with Gradient */}
+      <View style={styles.statsWrapper}>
+        <LinearGradient
+          colors={['#2563EB', '#1D4ED8']} // Blue-600 to Blue-700
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.statsGradient}
         >
-          <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active Tasks</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'history' && styles.activeTab]}
-          onPress={() => setActiveTab('history')}
-        >
-          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>History</Text>
-        </TouchableOpacity>
+          <View style={styles.statItem}>
+            <View style={styles.statIconBg}>
+              <Icon name="zap" size={22} color="#FFFFFF" />
+            </View>
+            <View>
+              <Text style={styles.statValueLight}>{stats.points}</Text>
+              <Text style={styles.statLabelLight}>{t('tech_dashboard.points_label')}</Text>
+            </View>
+          </View>
+          <View style={styles.statDividerLight} />
+          <View style={styles.statItem}>
+            <View style={styles.statIconBg}>
+              <Icon name="award" size={22} color="#FFFFFF" />
+            </View>
+            <View>
+              <Text style={styles.statValueLight}>Lvl {stats.level}</Text>
+              <Text style={styles.statLabelLight}>{t('tech_dashboard.role_label')}</Text>
+            </View>
+          </View>
+        </LinearGradient>
       </View>
 
-      {loading ? (
+      {/* Custom Tabs */}
+      <View style={styles.tabWrapper}>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'active' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('active')}
+          >
+            <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+              {t('tech_dashboard.active_tab')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('history')}
+          >
+            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+              {t('tech_dashboard.history_tab')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {loading && !refreshing ? (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#059669" />
-          <Text style={styles.emptySubText}>Loading tasks...</Text>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={styles.emptySubText}>{t('tech_dashboard.loading_tasks')}</Text>
         </View>
       ) : (
         <FlatList
@@ -151,14 +251,15 @@ const TechnicianDashboardScreen = () => {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Icon name="check-square" size={60} color="#D1D5DB" />
+              <Icon name={activeTab === 'active' ? 'check-circle' : 'clock'} size={60} color="#E5E7EB" />
               <Text style={styles.emptyText}>
-                {activeTab === 'active' ? 'No active tasks.' : 'No completed history.'}
+                {activeTab === 'active' ? t('tech_dashboard.no_active_tasks') : t('tech_dashboard.no_history_tasks')}
               </Text>
               <Text style={styles.emptySubText}>
-                {activeTab === 'active' ? 'Check back for new assignments.' : 'Your resolved tasks will appear here.'}
+                {activeTab === 'active' ? t('tech_dashboard.caught_up') : t('tech_dashboard.history_empty_sub')}
               </Text>
             </View>
           }
@@ -169,70 +270,133 @@ const TechnicianDashboardScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FF' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  statsWrapper: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  statsGradient: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  statItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12
+  },
+  statDividerLight: {
+    width: 1,
+    height: '60%',
+    backgroundColor: 'rgba(255,255,255,0.3)'
+  },
+  statIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+  statValueLight: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
+  statLabelLight: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
+
+  tabWrapper: {
+    paddingHorizontal: 20,
+    marginVertical: 12,
+  },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 5,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: 10,
   },
-  activeTab: {
-    borderBottomColor: '#059669',
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
   },
-  activeTabText: {
-    color: '#059669',
+  tabTextActive: {
+    color: '#111827',
   },
-  listContainer: { padding: 20 },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 16,
+
+  listContainer: { paddingHorizontal: 20, paddingBottom: 20 },
+
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     marginBottom: 16,
-    shadowColor: '#1F2937',
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 5 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 3,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F3F4F6'
   },
-  priorityBar: { width: 6 },
-  priorityBarHigh: { backgroundColor: '#EF4444' },
-  priorityBarMedium: { backgroundColor: '#F59E0B' },
-  priorityBarLow: { backgroundColor: '#6B7280' },
-  cardContent: { flex: 1, padding: 16 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  cardLocation: { fontSize: 13, color: '#6B7280', marginLeft: 4, flex: 1 },
-  priorityContainer: { justifyContent: 'center', alignItems: 'center', paddingRight: 16, width: 70 },
-  priorityText: { fontSize: 10, fontWeight: 'bold', marginTop: 4 },
-  priorityTextHigh: { color: '#EF4444' },
-  priorityTextMedium: { color: '#F59E0B' },
-  priorityTextLow: { color: '#6B7280' },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 16,
+    paddingBottom: 12
+  },
+  headerLeft: { flex: 1, marginRight: 12 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  timeText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
+
+  priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  priorityText: { fontSize: 11, fontWeight: 'bold' },
+
+  divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 16, marginRight: 16 },
+
+  cardBody: { padding: 16, paddingTop: 12 },
+  locationRow: { flexDirection: 'row', marginBottom: 16 },
+  iconContainer: { marginTop: 2, marginRight: 8 },
+  cardLocation: { fontSize: 14, color: '#4B5563', lineHeight: 20, flex: 1 },
+
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusBadge: {
-    marginTop: 8,
-    backgroundColor: '#E5E7EB',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
     alignSelf: 'flex-start'
   },
-  statusBadgeText: {
-    color: '#374151',
-    fontSize: 11,
-    fontWeight: '600'
-  },
+  statusBadgeText: { fontSize: 12, fontWeight: '700' },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -241,8 +405,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#4B5563',
+    fontWeight: '700',
+    color: '#374151',
     marginTop: 16
   },
   emptySubText: {

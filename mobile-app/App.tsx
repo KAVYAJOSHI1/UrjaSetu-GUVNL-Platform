@@ -1,3 +1,4 @@
+import '@/i18n'; // Initialize i18n
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ReportsProvider } from '@/contexts/ReportsContext';

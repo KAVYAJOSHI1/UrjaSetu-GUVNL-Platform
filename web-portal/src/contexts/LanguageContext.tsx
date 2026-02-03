@@ -26,27 +26,27 @@ const translations = {
     register_btn: "Register",
     has_account: "Already have an account?",
     login_link: "Login",
-    
+
     // Navigation
     nav_home: "Home",
     nav_feedback: "Feedback",
     nav_track: "Track",
     nav_guidance: "Guidance",
     nav_qr: "QR Report",
-    
+
     // Profile
     profile_title: "My Profile",
     logout_btn: "Logout",
     close_btn: "Close",
     details_title: "Details",
-    
+
     // Home
     home_welcome: "Welcome, Kavya!",
     home_subtitle: "How can we help you today?",
     home_report_btn: "Report Issue",
     home_track_btn: "Track Reports",
     home_activity: "Recent Activity",
-    
+
     // Feedback
     feedback_title: "Submit Feedback",
     feedback_report_tab: "Report an Issue",
@@ -55,11 +55,11 @@ const translations = {
     feedback_submit_report: "Submit Report",
     suggestion_placeholder: "How can we improve?",
     feedback_submit_suggestion: "Submit Suggestion",
-    
+
     // Track
     track_title: "Track Your Reports",
     track_empty: "You haven't submitted any reports yet.",
-    
+
     // Guidance
     guidance_title: "Guidance & Safety",
     guidance_emergency: "Emergency Contacts",
@@ -71,19 +71,19 @@ const translations = {
     guidance_a1: "Check your circuit breakers first. If they are fine, please report it using the Feedback tab.",
     guidance_q2: "How to protect from voltage spikes?",
     guidance_a2: "Using a good quality surge protector for sensitive electronics is highly recommended.",
-    
+
     // Status
     status_resolved: "Resolved",
     status_in_progress: "In Progress",
     status_acknowledged: "Acknowledged",
     status_submitted: "Submitted",
-    
+
     // Toasts
     toast_report_success: "Report submitted successfully!",
     toast_suggestion_success: "Suggestion submitted!",
     toast_desc_required: "Please enter a description.",
     toast_register_success: "Registration successful! Please log in.",
-    
+
     // Form Fields
     form_priority: "Priority",
     priority_low: "🟢 Low",
@@ -102,7 +102,7 @@ const translations = {
     priority_display_high: "🔴 High Priority",
     priority_display_medium: "🟡 Medium Priority",
     priority_display_low: "🟢 Low Priority",
-    
+
     // QR & Asset
     qr_title: "QR Asset Reporting",
     qr_instructions: "Scan the QR code on any GUVNL asset (pole, transformer, etc.) to view its history or report a new issue for that specific asset.",
@@ -131,27 +131,27 @@ const translations = {
     register_btn: "રજીસ્ટર કરો",
     has_account: "પહેલેથી એકાઉન્ટ છે?",
     login_link: "લોગીન કરો",
-    
+
     // Navigation
     nav_home: "હોમ",
     nav_feedback: "પ્રતિસાદ",
     nav_track: "ટ્રેક",
     nav_guidance: "માર્ગદર્શન",
     nav_qr: "QR રિપોર્ટ",
-    
+
     // Profile
     profile_title: "મારી પ્રોફાઇલ",
     logout_btn: "લૉગઆઉટ",
     close_btn: "બંધ કરો",
     details_title: "વિગતો",
-    
+
     // Home
     home_welcome: "સ્વાગત છે, કાવ્યા!",
     home_subtitle: "અમે આજે તમને કેવી રીતે મદદ કરી શકીએ?",
     home_report_btn: "સમસ્યાની જાણ કરો",
     home_track_btn: "રિપોર્ટ્સ ટ્રેક કરો",
     home_activity: "તાજેતરની પ્રવૃત્તિ",
-    
+
     // Feedback
     feedback_title: "પ્રતિસાદ આપો",
     feedback_report_tab: "સમસ્યાની જાણ કરો",
@@ -160,11 +160,11 @@ const translations = {
     feedback_submit_report: "રિપોર્ટ સબમિટ કરો",
     suggestion_placeholder: "અમે કેવી રીતે સુધારી શકીએ?",
     feedback_submit_suggestion: "સૂચન સબમિટ કરો",
-    
+
     // Track
     track_title: "તમારા રિપોર્ટ્સ ટ્રેક કરો",
     track_empty: "તમે હજી સુધી કોઈ રિપોર્ટ સબમિટ કર્યો નથી.",
-    
+
     // Guidance
     guidance_title: "માર્ગદર્શન અને સુરક્ષા",
     guidance_emergency: "ઇમરજન્સી સંપર્કો",
@@ -176,19 +176,19 @@ const translations = {
     guidance_a1: "પહેલા તમારા ઘરના સર્કિટ બ્રેકર્સ તપાસો. જો તે બરાબર હોય, તો કૃપા કરીને પ્રતિસાદ ટેબનો ઉપયોગ કરીને તેની જાણ કરો.",
     guidance_q2: "વોલ્ટેજ સ્પાઇક્સથી કેવી રીતે બચવું?",
     guidance_a2: "સંવેદનશીલ ઇલેક્ટ્રોનિક્સ માટે સારી ગુણવત્તાવાળા સર્જ પ્રોટેક્ટરનો ઉપયોગ કરવાની ભલામણ કરવામાં આવે છે.",
-    
+
     // Status
     status_resolved: "ઉકેલાઈ ગયું",
     status_in_progress: "પ્રગતિમાં છે",
     status_acknowledged: "સ્વીકાર્યું",
     status_submitted: "સબમિટ કર્યું",
-    
+
     // Toasts
     toast_report_success: "રિપોર્ટ સફળતાપૂર્વક સબમિટ થયો!",
     toast_suggestion_success: "સૂચન સબમિટ થયું!",
     toast_desc_required: "કૃપા કરીને વર્ણન દાખલ કરો.",
     toast_register_success: "રજીસ્ટ્રેશન સફળ! કૃપા કરીને લોગીન કરો.",
-    
+
     // Form Fields
     form_priority: "પ્રાથમિકતા",
     priority_low: "🟢 નીચી",
@@ -207,7 +207,7 @@ const translations = {
     priority_display_high: "🔴 ઉચ્ચ પ્રાથમિકતા",
     priority_display_medium: "🟡 મધ્યમ પ્રાથમિકતા",
     priority_display_low: "🟢 નીચી પ્રાથમિકતા",
-    
+
     // QR & Asset
     qr_title: "QR એસેટ રિપોર્ટિંગ",
     qr_instructions: "કોઈપણ GUVNL એસેટ (પોલ, ટ્રાન્સફોર્મર, વગેરે) પર QR કોડ સ્કેન કરો અને તેનો ઇતિહાસ જુઓ અથવા તે એસેટ માટે નવી સમસ્યાની જાણ કરો.",
@@ -241,6 +241,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {

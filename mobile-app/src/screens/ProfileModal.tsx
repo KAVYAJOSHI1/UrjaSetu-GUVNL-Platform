@@ -20,23 +20,23 @@ const ProfileModal = ({ isVisible, onClose }: ProfileModalProps) => {
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    // It's good practice to close the modal before logging out
-    // to prevent any visual glitches.
     onClose();
     logout();
   };
+
+
 
   return (
     <Modal
       transparent={true}
       visible={isVisible}
       animationType="fade"
-      onRequestClose={onClose} // For Android back button
+      onRequestClose={onClose}
     >
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity style={styles.modalContainer} activeOpacity={1} onPress={() => {}}>
-          <Text style={styles.title}>{t('profile_title')}</Text>
-          
+        <TouchableOpacity style={styles.modalContainer} activeOpacity={1} onPress={() => { }}>
+          <Text style={styles.title}>{t('profile.title') || 'Profile'}</Text>
+
           <View style={styles.infoContainer}>
             <View style={styles.infoRow}>
               <Icon name="user" size={20} color="#6B7280" />
@@ -53,11 +53,11 @@ const ProfileModal = ({ isVisible, onClose }: ProfileModalProps) => {
           </View>
 
           <View style={styles.buttonContainer}>
-             <TouchableOpacity onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>{t('logout_btn')}</Text>
+            <TouchableOpacity onPress={handleLogout}>
+              <Text style={styles.logoutButtonText}>{t('profile.logout') || 'Logout'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>{t('close_btn')}</Text>
+              <Text style={styles.closeButtonText}>{t('common.close_btn') || 'Close'}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -103,10 +103,50 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 16,
     color: '#374151',
-    flex: 1, // Allow text to wrap if long
+    flex: 1,
+  },
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  languageContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  langButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  langButtonActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0056b3',
+  },
+  langText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  langTextActive: {
+    color: '#0056b3',
+    fontWeight: '600',
   },
   buttonContainer: {
-    marginTop: 32,
+    marginTop: 24,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
@@ -133,4 +173,3 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileModal;
-
